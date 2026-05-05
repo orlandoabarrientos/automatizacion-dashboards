@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { setRows, upsertRow, addLog } from "@/lib/sheets-store";
+import { setDataset, upsertRow, addLog } from "@/lib/sheets-store";
 
-export const MAX_PAYLOAD_BYTES = 200_000;
-const MAX_STRING_LENGTH = 2000;
-const MAX_ARRAY_LENGTH = 10_000;
-const MAX_RECORD_KEYS = 200;
+const MAX_STRING_LENGTH = 5000;
+const MAX_ARRAY_LENGTH = 50_000;
 const MAX_KEY_LENGTH = 120;
 
 const RowSchema = z.record(
@@ -15,11 +13,17 @@ const RowSchema = z.record(
 
 const SyncPayloadSchema = z.object({
     event: z.string().min(1).max(120),
-    row: RowSchema.optional(),
-    rows: z.array(RowSchema).max(MAX_ARRAY_LENGTH).optional(),
-    updatedAt: z.string().datetime().optional(),
-}).refine((data) => data.row !== undefined || data.rows !== undefined, {
-    message: "Debe enviar 'row' o 'rows'",
+    source: z.string().min(1).max(120),
+    sheetName: z.string().min(1).max(120),
+    totalRows: z.number().int().min(0),
+    totalColumns: z.number().int().min(0),
+    columns: z.array(z.string().min(1).max(MAX_KEY_LENGTH)).max(200),
+    rows: z.array(RowSchema).max(MAX_ARRAY_LENGTH),
+    updatedAt: z.string().datetime(),
+    hash: z.string().min(1).max(120),
+    datasetType: z.string().min(1).max(120),
+}).refine((data) => data.rows.length > 0 || data.totalRows === 0, {
+    message: "El array rows no debe estar vacío si totalRows > 0",
 });
 
 const unauthorized = () =>
@@ -44,11 +48,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, message: "Body vacío" }, { status: 400 });
     }
 
-    const size = new TextEncoder().encode(rawBody).length;
-    if (size > MAX_PAYLOAD_BYTES) {
-        return NextResponse.json({ ok: false, message: "Payload demasiado grande" }, { status: 413 });
-    }
-
     let parsed: unknown;
     try {
         parsed = JSON.parse(rawBody);
@@ -69,23 +68,28 @@ export async function POST(req: Request) {
     }
 
     const data = result.data;
-    const updatedAt = data.updatedAt ?? new Date().toISOString();
 
     try {
-        if (data.rows) {
-            setRows(data.rows, updatedAt);
-        } else if (data.row) {
-            upsertRow(data.row, updatedAt);
-        }
+        setDataset({
+            rows: data.rows,
+            columns: data.columns,
+            updatedAt: data.updatedAt,
+            hash: data.hash,
+            totalRows: data.totalRows,
+            totalColumns: data.totalColumns,
+            sheetName: data.sheetName,
+            datasetType: data.datasetType,
+            source: data.source,
+        });
 
         addLog({
             event: data.event,
             status: "success",
-            message: `Recibido: ${data.rows ? data.rows.length + " filas" : "1 fila"}`,
+            message: `Recibido ${data.rows.length} filas, ${data.columns.length} columnas desde ${data.source}`,
             createdAt: new Date().toISOString(),
         });
 
-        return NextResponse.json({ ok: true, message: "Datos sincronizados" });
+        return NextResponse.json({ ok: true, message: "Datos sincronizados", receivedRows: data.rows.length });
     } catch (error) {
         const msg = error instanceof Error ? error.message : "Error interno";
         addLog({

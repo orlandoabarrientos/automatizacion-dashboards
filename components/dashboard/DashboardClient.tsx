@@ -1,28 +1,39 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import DashboardHeader, { DashboardStatus } from "@/components/dashboard/DashboardHeader";
-import MetricCard from "@/components/dashboard/MetricCard";
-import DashboardCharts from "@/components/dashboard/DashboardCharts";
-import DataTable from "@/components/dashboard/DataTable";
-import LogsPanel from "@/components/dashboard/LogsPanel";
-import EmptyState from "@/components/dashboard/EmptyState";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { DashboardDataResponse } from "@/lib/dashboard/types";
-import { formatDate } from "@/lib/dashboard/formatting";
+import DashboardShell from "@/components/dashboard/DashboardShell";
+import type { DashboardDataResponse, DashboardFilters, DashboardStatus, ParsedRow } from "@/lib/dashboard/types";
+import { applyDashboardFilters } from "@/lib/dashboard/filters";
+import { buildKpis } from "@/lib/dashboard/metrics";
+import { buildAnalytics } from "@/lib/dashboard/analytics";
+import { detectAllFields } from "@/lib/dashboard/field-detection";
 
-const POLL_INTERVAL = 5000;
-
-const formatMetricNumber = (value: number | null) => {
-    if (value === null || Number.isNaN(value)) return "-";
-    return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(value);
-};
+const POLL_INTERVAL = 8000;
 
 export default function DashboardClient() {
-    const [data, setData] = useState<DashboardDataResponse | null>(null);
+    const [rawData, setRawData] = useState<DashboardDataResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [filters, setFilters] = useState<DashboardFilters>({
+        dateFrom: null,
+        dateTo: null,
+        mes: null,
+        estado: null,
+        canal: null,
+        vendedor: null,
+        ciudad: null,
+        sucursal: null,
+        campana: null,
+        productoCategoria: null,
+        temperaturaLead: null,
+        prioridad: null,
+        riesgoChurn: null,
+        facturaEnviada: null,
+        cumplimientoSla: null,
+        montoMin: null,
+        montoMax: null,
+    });
 
     const fetchDashboard = useCallback(async (showSpinner: boolean) => {
         if (showSpinner) setIsRefreshing(true);
@@ -32,7 +43,7 @@ export default function DashboardClient() {
             if (!payload.ok) {
                 throw new Error(payload.message ?? "Respuesta inválida");
             }
-            setData(payload);
+            setRawData(payload);
             setError(null);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Error inesperado");
@@ -54,78 +65,99 @@ export default function DashboardClient() {
         return () => window.clearInterval(interval);
     }, [fetchDashboard]);
 
+    const filteredData = useMemo(() => {
+        if (!rawData) return null;
+        const filteredRows = applyDashboardFilters(rawData.rows, filters);
+        const fields = detectAllFields(rawData.columns);
+        const kpis = buildKpis(filteredRows, fields);
+        const { stats, charts, summary } = buildAnalytics(filteredRows, rawData.columns);
+
+        // Recalculate top-level metrics
+        const totalRows = filteredRows.length;
+        const wonCount = fields.estado
+            ? filteredRows.filter((r) => {
+                  const s = String(r[fields.estado!] ?? "").toLowerCase();
+                  return ["ganado", "win", "won", "closed won", "completado", "facturado"].some((k) => s.includes(k));
+              }).length
+            : 0;
+        const totalRevenue = fields.monto
+            ? filteredRows.reduce((sum, r) => {
+                  const m = extractNumericValue(r[fields.monto!]);
+                  return m !== null ? sum + m : sum;
+              }, 0)
+            : 0;
+        const avgTicket = totalRows > 0 ? totalRevenue / totalRows : 0;
+        const conversionRate = totalRows > 0 ? wonCount / totalRows : 0;
+
+        return {
+            ...rawData,
+            rows: filteredRows,
+            metrics: {
+                totalRows,
+                conversionRate,
+                totalRevenue,
+                averageTicket: avgTicket,
+            },
+            kpis,
+            statistics: stats,
+            charts,
+            executiveSummary: summary,
+        };
+    }, [rawData, filters]);
+
     const status: DashboardStatus = useMemo(() => {
         if (error) return "error";
-        if (data && data.rows.length > 0) return "connected";
+        if (filteredData && filteredData.rows.length > 0) return "connected";
         return "empty";
-    }, [data, error]);
-
-    const metrics = data?.metrics;
+    }, [filteredData, error]);
 
     if (loading) {
         return (
             <main className="min-h-screen bg-(--background) px-4 py-10 sm:px-6">
                 <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-                    <Skeleton className="h-40 w-full" />
+                    <div className="h-40 w-full animate-pulse rounded-3xl bg-(--muted)" />
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         {Array.from({ length: 4 }).map((_, i) => (
-                            <Skeleton key={i} className="h-28 w-full" />
+                            <div key={i} className="h-28 w-full animate-pulse rounded-2xl bg-(--muted)" />
                         ))}
                     </div>
-                    <Skeleton className="h-72 w-full" />
-                    <Skeleton className="h-80 w-full" />
+                    <div className="h-72 w-full animate-pulse rounded-2xl bg-(--muted)" />
                 </div>
             </main>
         );
     }
 
     return (
-        <main className="min-h-screen bg-(--background) px-4 py-10 sm:px-6">
-            <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
-                <DashboardHeader
-                    status={status}
-                    lastSync={data?.lastSync ?? null}
-                    onRefresh={() => fetchDashboard(true)}
-                    isRefreshing={isRefreshing}
-                />
-
-                {error ? (
-                    <div className="rounded-3xl border border-(--border) bg-(--panel) p-6 text-sm text-(--muted-foreground)">
-                        <p className="font-semibold text-(--foreground)">Error</p>
-                        <p className="mt-1">{error}</p>
-                    </div>
-                ) : null}
-
-                {data && data.rows.length === 0 ? <EmptyState /> : null}
-
-                {metrics && data && data.rows.length > 0 ? (
-                    <>
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <MetricCard label="Total registros" value={formatMetricNumber(metrics.totalRows)} />
-                            <MetricCard
-                                label="Registros activos"
-                                value={formatMetricNumber(metrics.activeRows)}
-                                helper={metrics.statusField ? `Campo: ${metrics.statusField}` : "Sin estado"}
-                            />
-                            <MetricCard
-                                label="Suma total"
-                                value={formatMetricNumber(metrics.totalAmount)}
-                                helper={metrics.amountField ? `Campo: ${metrics.amountField}` : "Sin monto"}
-                            />
-                            <MetricCard
-                                label="Última sincronización"
-                                value={data.lastSync ? formatDate(data.lastSync) : "-"}
-                            />
-                        </div>
-
-                        <DashboardCharts charts={data.charts} metrics={metrics} />
-
-                        <DataTable rows={data.rows} columns={data.columns} />
-
-                        <LogsPanel logs={data.logs} />
-                    </>
-                ) : null}
-            </div>
-        </main>
+        <DashboardShell
+            data={filteredData}
+            status={status}
+            error={error}
+            filters={filters}
+            onFiltersChange={setFilters}
+            onRefresh={() => fetchDashboard(true)}
+            isRefreshing={isRefreshing}
+        />
     );
+}
+
+function extractNumericValue(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string") return null;
+    const cleaned = value.replace(/[^0-9,.-]/g, "").trim();
+    if (!cleaned) return null;
+    const hasComma = cleaned.includes(",");
+    const hasDot = cleaned.includes(".");
+    let normalized = cleaned;
+    if (hasComma && hasDot) {
+        const lastComma = cleaned.lastIndexOf(",");
+        const lastDot = cleaned.lastIndexOf(".");
+        const decimalSeparator = lastComma > lastDot ? "," : ".";
+        const thousandSeparator = decimalSeparator === "," ? "." : ",";
+        normalized = cleaned.split(thousandSeparator).join("").replace(decimalSeparator, ".");
+    } else if (hasComma) {
+        normalized = cleaned.replace(/,/g, ".");
+    }
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
 }

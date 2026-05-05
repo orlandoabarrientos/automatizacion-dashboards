@@ -9,8 +9,8 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard de Sincronizacion",
-  description: "Panel de sincronizacion entre n8n y Google Sheets",
+  title: "Dashboard Empresarial",
+  description: "Panel ejecutivo de ventas sincronizado por n8n desde Google Sheets",
 };
 
 export default function RootLayout({

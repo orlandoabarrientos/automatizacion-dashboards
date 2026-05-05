@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Search, ChevronLeft, ChevronRight, Eye, EyeOff, Columns, ArrowUpDown, ArrowUp, ArrowDown, FileJson } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
     Table,
     TableBody,
@@ -12,161 +13,267 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { extractNumericValue, sanitizeText } from "@/lib/dashboard/formatting";
+import { Dialog, DialogHeader, DialogTitle, DialogContent } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ParsedRow } from "@/lib/dashboard/types";
-import JsonViewerModal from "./JsonViewerModal";
+import { extractNumericValue, formatCurrency, formatDate, formatPercent, sanitizeText } from "@/lib/dashboard/formatting";
+import { detectAllFields } from "@/lib/dashboard/field-detection";
 
-const getCellValue = (value: unknown) => {
-    if (value === null || value === undefined) return "-";
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-        return sanitizeText(value, 80) || "-";
+function detectColumnType(column: string): "date" | "currency" | "percent" | "number" | "text" {
+    const lower = column.toLowerCase();
+    if (lower.includes("fecha") || lower.includes("date") || lower.includes("sync")) return "date";
+    if (lower.includes("monto") || lower.includes("amount") || lower.includes("usd") || lower.includes("bs") || lower.includes("precio") || lower.includes("costo") || lower.includes("margen_usd")) return "currency";
+    if (lower.includes("pct") || lower.includes("percent") || lower.includes("probabilidad") || lower.includes("conversion") || lower.includes("tasa")) return "percent";
+    if (lower.includes("num") || lower.includes("count") || lower.includes("cantidad") || lower.includes("dias") || lower.includes("llamadas") || lower.includes("mensajes") || lower.includes("tiempo")) return "number";
+    return "text";
+}
+
+function getBadgeTone(column: string, value: unknown): "success" | "warning" | "danger" | "neutral" | "info" {
+    const str = String(value ?? "").trim().toLowerCase();
+    const lowerCol = column.toLowerCase();
+
+    if (lowerCol.includes("estado")) {
+        if (["ganado", "win", "won", "completado", "paid", "pagado", "facturado"].some((k) => str.includes(k))) return "success";
+        if (["perdido", "lost", "cancelado", "rechazado"].some((k) => str.includes(k))) return "danger";
+        if (["abierto", "open", "en proceso", "proceso", "pendiente", "nuevo"].some((k) => str.includes(k))) return "info";
+        return "neutral";
     }
-    return sanitizeText(JSON.stringify(value), 80) || "-";
-};
+
+    if (lowerCol.includes("prioridad")) {
+        if (["alta", "high", "critica", "urgente"].some((k) => str.includes(k))) return "danger";
+        if (["media", "medium", "normal"].some((k) => str.includes(k))) return "warning";
+        if (["baja", "low"].some((k) => str.includes(k))) return "success";
+        return "neutral";
+    }
+
+    if (lowerCol.includes("riesgo") || lowerCol.includes("risk")) {
+        if (["alto", "high", "critico"].some((k) => str.includes(k))) return "danger";
+        if (["medio", "medium", "moderado"].some((k) => str.includes(k))) return "warning";
+        if (["bajo", "low", "minimo"].some((k) => str.includes(k))) return "success";
+        return "neutral";
+    }
+
+    if (lowerCol.includes("sla") || lowerCol.includes("cumplimiento")) {
+        if (["true", "1", "si", "yes", "completo", "cumple"].some((k) => str.includes(k))) return "success";
+        if (["false", "0", "no", "incumple"].some((k) => str.includes(k))) return "danger";
+        return "neutral";
+    }
+
+    if (lowerCol.includes("temperatura") || lowerCol.includes("temp")) {
+        if (["caliente", "hot", "alta"].some((k) => str.includes(k))) return "danger";
+        if (["tibio", "warm", "media"].some((k) => str.includes(k))) return "warning";
+        if (["frio", "cold", "baja"].some((k) => str.includes(k))) return "info";
+        return "neutral";
+    }
+
+    return "neutral";
+}
+
+function formatCell(column: string, value: unknown): string {
+    const type = detectColumnType(column);
+    if (value === null || value === undefined) return "—";
+    if (type === "currency") {
+        const num = extractNumericValue(value);
+        return num !== null ? formatCurrency(num) : String(value);
+    }
+    if (type === "percent") {
+        const num = extractNumericValue(value);
+        if (num !== null) {
+            return formatPercent(num > 1 ? num / 100 : num);
+        }
+        return String(value);
+    }
+    if (type === "date") {
+        return formatDate(String(value));
+    }
+    if (type === "number") {
+        const num = extractNumericValue(value);
+        return num !== null ? num.toLocaleString("es-ES", { maximumFractionDigits: 2 }) : String(value);
+    }
+    return sanitizeText(String(value), 80) || "—";
+}
 
 type DataTableProps = {
     rows: ParsedRow[];
     columns: string[];
 };
 
-type SortDirection = "asc" | "desc";
-
-type SortState = {
-    field: string;
-    direction: SortDirection;
-};
-
 export default function DataTable({ rows, columns }: DataTableProps) {
-    const [search, setSearch] = useState("");
-    const [filterField, setFilterField] = useState("");
-    const [filterValue, setFilterValue] = useState("");
-    const [sortState, setSortState] = useState<SortState>({
-        field: columns[0] || "",
-        direction: "asc",
-    });
+    const [globalSearch, setGlobalSearch] = useState("");
+    const [sortField, setSortField] = useState<string | null>(null);
+    const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(columns.slice(0, 12));
+    const [showColumnSelector, setShowColumnSelector] = useState(false);
+    const [page, setPage] = useState(0);
+    const [pageSize, setPageSize] = useState(25);
     const [selectedRow, setSelectedRow] = useState<ParsedRow | null>(null);
 
+    // Reset page when rows change significantly
+    // But we won't use effect to avoid loops; user can reset manually or we accept staying on same page
+
+    const fields = useMemo(() => detectAllFields(columns), [columns]);
+
     const filteredRows = useMemo(() => {
-        const query = search.trim().toLowerCase();
-        const filterKey = filterField.trim();
-        const filterQuery = filterValue.trim().toLowerCase();
+        const query = globalSearch.trim().toLowerCase();
+        let data = rows;
+        if (query) {
+            data = data.filter((row) =>
+                Object.values(row)
+                    .map((v) => String(v ?? ""))
+                    .join(" ")
+                    .toLowerCase()
+                    .includes(query)
+            );
+        }
+        if (sortField) {
+            data = [...data].sort((a, b) => {
+                const dir = sortDir === "asc" ? 1 : -1;
+                const type = detectColumnType(sortField);
+                let valA = a[sortField];
+                let valB = b[sortField];
 
-        return rows
-            .filter((row) => {
-                if (query) {
-                    const haystack = Object.values(row)
-                        .map((v) => String(v ?? ""))
-                        .join(" ")
-                        .toLowerCase();
-                    if (!haystack.includes(query)) return false;
+                if (type === "number" || type === "currency" || type === "percent") {
+                    const numA = extractNumericValue(valA);
+                    const numB = extractNumericValue(valB);
+                    if (numA !== null && numB !== null) return (numA - numB) * dir;
+                    if (numA !== null) return -1 * dir;
+                    if (numB !== null) return 1 * dir;
                 }
-                if (filterKey && filterQuery) {
-                    const textValue = String(row[filterKey] ?? "").toLowerCase();
-                    if (!textValue.includes(filterQuery)) return false;
-                }
-                return true;
-            })
-            .sort((a, b) => {
-                const direction = sortState.direction === "asc" ? 1 : -1;
-                const field = sortState.field;
-
-                const getValue = (row: ParsedRow) => {
-                    const raw = row[field];
-                    const numeric = extractNumericValue(raw);
-                    if (numeric !== null) return numeric;
-                    return String(raw ?? "").toLowerCase();
-                };
-
-                const valueA = getValue(a);
-                const valueB = getValue(b);
-
-                if (typeof valueA === "number" && typeof valueB === "number") {
-                    return (valueA - valueB) * direction;
-                }
-                return String(valueA).localeCompare(String(valueB)) * direction;
+                return String(valA ?? "").localeCompare(String(valB ?? "")) * dir;
             });
-    }, [rows, search, filterField, filterValue, sortState]);
+        }
+        return data;
+    }, [rows, globalSearch, sortField, sortDir]);
 
-    const toggleSort = (field: string) => {
-        setSortState((prev) => {
-            if (prev.field === field) {
-                return {
-                    field,
-                    direction: prev.direction === "asc" ? "desc" : "asc",
-                };
-            }
-            return { field, direction: "asc" };
+    const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+    const currentPage = Math.min(page, totalPages - 1);
+    const paginatedRows = filteredRows.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+
+    const toggleColumn = (col: string) => {
+        setVisibleColumns((prev) => {
+            if (prev.includes(col)) return prev.filter((c) => c !== col);
+            return [...prev, col];
         });
+    };
+
+    const handleSort = (col: string) => {
+        if (sortField === col) {
+            setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+        } else {
+            setSortField(col);
+            setSortDir("asc");
+        }
     };
 
     return (
         <div className="space-y-4">
-            <div className="grid gap-3 rounded-2xl border border-(--border) bg-(--panel) p-4 md:grid-cols-[2fr_1fr_1fr]">
-                <Input
-                    placeholder="Buscar por cualquier campo..."
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                />
-                <Select value={filterField} onChange={(event) => setFilterField(event.target.value)}>
-                    <option value="">Filtrar por columna</option>
-                    {columns.map((column) => (
-                        <option key={column} value={column}>
-                            {column}
-                        </option>
-                    ))}
-                </Select>
-                <Input
-                    placeholder="Valor del filtro"
-                    value={filterValue}
-                    onChange={(event) => setFilterValue(event.target.value)}
-                />
+            {/* Toolbar */}
+            <div className="flex flex-col gap-3 rounded-2xl border border-(--border) bg-(--panel) p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="relative w-full sm:max-w-sm">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--muted-foreground)" />
+                    <Input
+                        className="pl-9"
+                        placeholder="Buscar en todas las columnas..."
+                        value={globalSearch}
+                        onChange={(e) => {
+                            setGlobalSearch(e.target.value);
+                            setPage(0);
+                        }}
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowColumnSelector((s) => !s)} className="gap-1">
+                        <Columns className="h-3.5 w-3.5" />
+                        Columnas
+                    </Button>
+                    <span className="text-xs text-(--muted-foreground)">
+                        Mostrando {filteredRows.length.toLocaleString("es-ES")} de {rows.length.toLocaleString("es-ES")}
+                    </span>
+                </div>
             </div>
 
-            <div className="rounded-3xl border border-(--border) bg-(--panel) overflow-hidden">
-                <div className="flex flex-col gap-2 border-b border-(--border) px-4 py-3 text-sm text-(--muted-foreground) md:flex-row md:items-center md:justify-between">
-                    <p>
-                        Mostrando <span className="text-(--foreground)">{filteredRows.length}</span> de {rows.length}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Badge tone="neutral">Orden: {sortState.field || "-"}</Badge>
-                        <Badge tone="neutral">{sortState.direction === "asc" ? "Asc" : "Desc"}</Badge>
+            {/* Column selector */}
+            {showColumnSelector && (
+                <div className="rounded-2xl border border-(--border) bg-(--panel) p-4">
+                    <p className="mb-2 text-xs font-medium text-(--muted-foreground)">Seleccionar columnas visibles</p>
+                    <div className="flex flex-wrap gap-2">
+                        {columns.map((col) => {
+                            const active = visibleColumns.includes(col);
+                            return (
+                                <button
+                                    key={col}
+                                    type="button"
+                                    onClick={() => toggleColumn(col)}
+                                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs transition ${
+                                        active
+                                            ? "border-(--accent) bg-(--accent)/10 text-(--accent)"
+                                            : "border-(--border) bg-(--background) text-(--muted-foreground)"
+                                    }`}
+                                >
+                                    {active ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                    {col}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
-                <div className="overflow-x-auto">
+            )}
+
+            {/* Table */}
+            <div className="rounded-3xl border border-(--border) bg-(--panel) overflow-hidden">
+                <ScrollArea className="overflow-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                {columns.map((column) => (
-                                    <TableHead
-                                        key={column}
-                                        className="cursor-pointer whitespace-nowrap"
-                                        onClick={() => toggleSort(column)}
-                                    >
-                                        {column}
+                                {visibleColumns.map((col) => (
+                                    <TableHead key={col} className="cursor-pointer whitespace-nowrap" onClick={() => handleSort(col)}>
+                                        <div className="flex items-center gap-1">
+                                            {col}
+                                            {sortField === col ? (
+                                                sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                            ) : (
+                                                <ArrowUpDown className="h-3 w-3 opacity-30" />
+                                            )}
+                                        </div>
                                     </TableHead>
                                 ))}
-                                <TableHead>Acciones</TableHead>
+                                <TableHead className="w-20">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredRows.length === 0 ? (
+                            {paginatedRows.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={columns.length + 1} className="py-10 text-center text-sm text-(--muted-foreground)">
+                                    <TableCell colSpan={visibleColumns.length + 1} className="py-12 text-center text-sm text-(--muted-foreground)">
                                         No hay resultados para mostrar.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredRows.map((row, index) => (
-                                    <TableRow key={index}>
-                                        {columns.map((column) => (
-                                            <TableCell key={`${index}-${column}`} className="whitespace-nowrap">
-                                                {getCellValue(row[column])}
-                                            </TableCell>
-                                        ))}
+                                paginatedRows.map((row, idx) => (
+                                    <TableRow key={idx} className="hover:bg-(--muted)/50">
+                                        {visibleColumns.map((col) => {
+                                            const val = row[col];
+                                            const tone = getBadgeTone(col, val);
+                                            const isBadgeCol =
+                                                col.toLowerCase().includes("estado") ||
+                                                col.toLowerCase().includes("prioridad") ||
+                                                col.toLowerCase().includes("riesgo") ||
+                                                col.toLowerCase().includes("sla") ||
+                                                col.toLowerCase().includes("temperatura") ||
+                                                col.toLowerCase().includes("cumplimiento");
+                                            return (
+                                                <TableCell key={col} className="whitespace-nowrap text-sm">
+                                                    {isBadgeCol ? (
+                                                        <Badge tone={tone === "info" ? "neutral" : tone}>{formatCell(col, val)}</Badge>
+                                                    ) : (
+                                                        formatCell(col, val)
+                                                    )}
+                                                </TableCell>
+                                            );
+                                        })}
                                         <TableCell>
-                                            <Button variant="ghost" size="sm" onClick={() => setSelectedRow(row)}>
-                                                Ver JSON
+                                            <Button variant="ghost" size="sm" onClick={() => setSelectedRow(row)} className="gap-1 px-2">
+                                                <FileJson className="h-3.5 w-3.5" />
+                                                <span className="sr-only">Ver</span>
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -174,9 +281,59 @@ export default function DataTable({ rows, columns }: DataTableProps) {
                             )}
                         </TableBody>
                     </Table>
+                </ScrollArea>
+
+                {/* Pagination */}
+                <div className="flex flex-col items-center justify-between gap-3 border-t border-(--border) px-4 py-3 sm:flex-row">
+                    <div className="flex items-center gap-2 text-xs text-(--muted-foreground)">
+                        <span>Página {currentPage + 1} de {totalPages}</span>
+                        <span>|</span>
+                        <SelectPageSize value={pageSize} onChange={(v) => { setPageSize(v); setPage(0); }} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={currentPage === 0}>
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={currentPage >= totalPages - 1}>
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
             </div>
-            <JsonViewerModal open={Boolean(selectedRow)} row={selectedRow} onClose={() => setSelectedRow(null)} />
+
+            {/* Detail Dialog */}
+            <Dialog open={!!selectedRow} onClose={() => setSelectedRow(null)}>
+                <DialogHeader>
+                    <DialogTitle>Detalle de registro</DialogTitle>
+                </DialogHeader>
+                <DialogContent>
+                    {selectedRow && (
+                        <div className="space-y-2">
+                            {Object.entries(selectedRow).map(([key, value]) => (
+                                <div key={key} className="flex justify-between gap-4 rounded-lg border border-(--border) px-3 py-2">
+                                    <span className="text-xs font-medium text-(--muted-foreground)">{key}</span>
+                                    <span className="text-right text-sm text-(--foreground)">{formatCell(key, value)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
+    );
+}
+
+function SelectPageSize({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+    return (
+        <select
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="rounded-md border border-(--border) bg-(--background) px-2 py-1 text-xs text-(--foreground) outline-none"
+        >
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+        </select>
     );
 }
