@@ -1,1 +1,46 @@
 @import "tailwindcss";
+
+:root {
+    color-scheme: light dark;
+    --background: #f6f5f1;
+    --panel: #ffffff;
+    --panel-strong: #f1efe9;
+    --foreground: #1f2933;
+    --muted: #f0efe9;
+    --muted-strong: #e6e2db;
+    --muted-foreground: #6b6a65;
+    --border: rgba(15, 23, 42, 0.12);
+    --accent: #0f766e;
+    --accent-foreground: #f8fafc;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background: #0b0f0f;
+        --panel: #111515;
+        --panel-strong: #0f1414;
+        --foreground: #f2f4f3;
+        --muted: #171c1c;
+        --muted-strong: #1d2323;
+        --muted-foreground: #9aa4a2;
+        --border: rgba(148, 163, 184, 0.2);
+        --accent: #2dd4bf;
+        --accent-foreground: #0b0f0f;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans), "Segoe UI", "Helvetica Neue", sans-serif;
+    background-image:
+        radial-gradient(circle at top left, rgba(45, 212, 191, 0.12), transparent 45%),
+        radial-gradient(circle at 30% 70%, rgba(15, 118, 110, 0.12), transparent 50%);
+    background-color: var(--background);
+}
+
+::selection {
+    background: rgba(15, 118, 110, 0.25);
+}

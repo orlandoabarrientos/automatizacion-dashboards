@@ -1,34 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dashboard de Sincronizacion
 
-## Getting Started
+Sistema de dashboard que recibe datos desde n8n, los guarda en PostgreSQL y los muestra con metricas, graficos y logs.
 
-First, run the development server:
+## Requisitos
+
+- Node.js 20+
+- PostgreSQL
+
+## Configuracion
+
+1. Copia .env.example a .env.
+2. Completa DATABASE_URL y N8N_DASHBOARD_SECRET.
+
+## Instalacion
+
+```bash
+npm install
+```
+
+## Migraciones Prisma
+
+```bash
+npx prisma migrate dev --name init
+npx prisma generate
+```
+
+## Ejecutar
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Endpoints
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- POST /api/sheets-sync
+- GET /api/dashboard-data
+- GET /api/sync-logs
+- GET /api/health
 
-## Learn More
+## Prueba con curl
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+curl -X POST http://localhost:3000/api/sheets-sync \
+	-H "Content-Type: application/json" \
+	-H "x-dashboard-secret: cambia_este_secreto_largo" \
+	-d '{
+		"event": "row_added_or_updated",
+		"id": "demo-1",
+		"rowNumber": 1,
+		"data": {
+			"nombre": "Cliente Demo",
+			"telefono": "+584121234567",
+			"estado": "activo",
+			"monto": "150",
+			"fecha": "2026-05-04"
+		},
+		"previous": null,
+		"source": {
+			"type": "google_sheets",
+			"spreadsheetId": "demo-sheet",
+			"sheetName": "Hoja1"
+		},
+		"syncedAt": "2026-05-04T00:00:00.000Z"
+	}'
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Configurar n8n
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- URL: http://localhost:3000/api/sheets-sync
+- Header: x-dashboard-secret: 123456789
 
-## Deploy on Vercel
+## Verificacion rapida
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Ejecuta el servidor con npm run dev.
+2. Ejecuta el curl de prueba.
+3. Entra a /dashboard y confirma tablas, metricas, graficos y logs.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Errores comunes
+
+- 401: el secreto no coincide con N8N_DASHBOARD_SECRET.
+- 422: payload invalido, revisa campos obligatorios.
+- 500: revisa DATABASE_URL y migraciones de Prisma.
