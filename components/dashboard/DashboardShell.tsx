@@ -26,9 +26,10 @@ type Props = {
     onFiltersChange: (f: DashboardFilters) => void;
     onRefresh: () => void;
     isRefreshing: boolean;
+    refreshMessage: string | null;
 };
 
-export default function DashboardShell({ data, status, error, filters, onFiltersChange, onRefresh, isRefreshing }: Props) {
+export default function DashboardShell({ data, status, error, filters, onFiltersChange, onRefresh, isRefreshing, refreshMessage }: Props) {
     const [tab, setTab] = useState("resumen");
 
     if (error && !data) {
@@ -55,6 +56,7 @@ export default function DashboardShell({ data, status, error, filters, onFilters
                     totalColumns={columns.length}
                     onRefresh={onRefresh}
                     isRefreshing={isRefreshing}
+                    refreshMessage={refreshMessage}
                 />
 
                 {!hasData ? (

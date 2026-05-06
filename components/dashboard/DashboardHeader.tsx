@@ -15,6 +15,7 @@ type Props = {
     totalColumns: number;
     onRefresh: () => void;
     isRefreshing: boolean;
+    refreshMessage: string | null;
 };
 
 const config: Record<DashboardStatus, { label: string; tone: "success" | "warning" | "danger" | "neutral" }> = {
@@ -29,7 +30,7 @@ const dot: Record<DashboardStatus, "success" | "warning" | "danger" | "neutral">
     error: "danger",
 };
 
-export default function DashboardHeader({ status, lastSync, totalRows, totalColumns, onRefresh, isRefreshing }: Props) {
+export default function DashboardHeader({ status, lastSync, totalRows, totalColumns, onRefresh, isRefreshing, refreshMessage }: Props) {
     const c = config[status];
     return (
         <div className="flex flex-col gap-6 rounded-3xl border border-(--border) bg-(--panel) p-6 shadow-sm">
@@ -47,11 +48,14 @@ export default function DashboardHeader({ status, lastSync, totalRows, totalColu
                         Datos sincronizados por n8n desde Google Sheets. Sin base de datos.
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col items-end gap-2">
                     <Button variant="outline" onClick={onRefresh} disabled={isRefreshing} className="gap-2">
                         <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-                        {isRefreshing ? "Actualizando..." : "Actualizar"}
+                        {isRefreshing ? "Actualizando..." : "Actualizar desde n8n"}
                     </Button>
+                    {refreshMessage ? (
+                        <p className="max-w-xs text-right text-xs text-(--muted-foreground)">{refreshMessage}</p>
+                    ) : null}
                 </div>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
