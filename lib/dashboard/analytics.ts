@@ -12,6 +12,12 @@ import { detectAllFields, type FieldMap } from "./field-detection";
 import { extractNumericValue, toMonthKey, parseDateValue, extractBooleanValue } from "./formatting";
 import { groupByField, groupAndAgg, buildRanking, buildConversionRanking } from "./grouping";
 import { median, percentile, standardDeviation } from "./statistics";
+import {
+    buildInvoicesRequiredVsSent,
+    buildMontosVsProbabilidad,
+    buildRiskDistribution,
+    buildPipelineFunnel,
+} from "./chart-builders";
 
 const WIN_STATUS_KEYWORDS = ["ganado", "win", "won", "closed won", "completado", "facturado"];
 const LOST_STATUS_KEYWORDS = ["perdido", "lost", "closed lost", "cancelado", "descartado"];
@@ -222,9 +228,7 @@ export function buildAnalytics(rows: ParsedRow[], columns: string[]) {
         ? Object.entries(groupByField(rows, fields.temperaturaLead)).map(([name, value]) => ({ name, value }))
         : [];
 
-    const riskDistribution: ChartPoint[] = fields.riesgoChurn
-        ? Object.entries(groupByField(rows, fields.riesgoChurn)).map(([name, value]) => ({ name, value }))
-        : [];
+    const riskDistribution = buildRiskDistribution(rows);
 
     // Monthly conversion rate
     const conversionRateMonthly: ChartPoint[] = stats.monthlyCohorts.map((c) => ({
@@ -233,32 +237,10 @@ export function buildAnalytics(rows: ParsedRow[], columns: string[]) {
     }));
 
     // Invoices required vs sent
-    const invoicesRequiredVsSent: ChartPoint[] = [];
-    if (fields.facturaRequerida && fields.facturaEnviada) {
-        let req = 0;
-        let sent = 0;
-        for (const row of rows) {
-            const r = extractBooleanValue(row[fields.facturaRequerida]);
-            const s = extractBooleanValue(row[fields.facturaEnviada]);
-            if (r === true) req++;
-            if (s === true) sent++;
-        }
-        invoicesRequiredVsSent.push({ name: "Requeridas", value: req });
-        invoicesRequiredVsSent.push({ name: "Enviadas", value: sent });
-    }
+    const invoicesRequiredVsSent = buildInvoicesRequiredVsSent(rows);
 
     // Monto vs probabilidad
-    const montosVsProbabilidad: Array<{ monto: number; probabilidad: number; canal: string }> = [];
-    if (fields.monto && fields.probabilidadCierre) {
-        for (const row of rows) {
-            const m = extractNumericValue(row[fields.monto]);
-            const p = extractNumericValue(row[fields.probabilidadCierre]);
-            const c = fields.canal ? String(row[fields.canal] ?? "Sin canal") : "Sin canal";
-            if (m !== null && p !== null) {
-                montosVsProbabilidad.push({ monto: m, probabilidad: p > 1 ? p / 100 : p, canal: c });
-            }
-        }
-    }
+    const montosVsProbabilidad = buildMontosVsProbabilidad(rows);
 
     // City vs Channel heatmap data
     const cityVsChannel: Array<{ ciudad: string; canal: string; count: number }> = [];
@@ -283,7 +265,7 @@ export function buildAnalytics(rows: ParsedRow[], columns: string[]) {
         statusDistribution,
         revenueByChannel,
         sellerRanking,
-        pipelineFunnel: stats.funnel,
+        pipelineFunnel: buildPipelineFunnel(rows),
         leadTemperature,
         riskDistribution,
         conversionRateMonthly,
@@ -325,7 +307,7 @@ export function buildAnalytics(rows: ParsedRow[], columns: string[]) {
         summary.push({ text: `El pipeline abierto representa ${new Intl.NumberFormat("es-ES", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(pipelineAmount)}.`, tone: "neutral" });
     }
 
-    if (fields.facturaRequerida && fields.facturaEnviada) {
+    if (invoicesRequiredVsSent.length > 0) {
         const pending = Math.max(0, invoicesRequiredVsSent[0]?.value ?? 0 - (invoicesRequiredVsSent[1]?.value ?? 0));
         summary.push({ text: `Hay ${pending} facturas pendientes de envío.`, tone: pending > 0 ? "warning" : "good" });
     }

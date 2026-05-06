@@ -172,6 +172,14 @@ export type DashboardDataResponse = {
     hash: string | null;
     lastFetchedAt: string;
     message?: string;
+    diagnostics?: {
+        totalRows: number;
+        invoicesRequiredVsSentCount: number;
+        montosVsProbabilidadCount: number;
+        riskDistributionCount: number;
+        pipelineFunnelCount: number;
+        sampleRow: ParsedRow | undefined;
+    };
 };
 
 export type SyncPayload = {

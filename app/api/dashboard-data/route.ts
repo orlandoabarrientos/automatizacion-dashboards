@@ -4,6 +4,12 @@ import { buildKpis } from "@/lib/dashboard/metrics";
 import { buildAnalytics } from "@/lib/dashboard/analytics";
 import { detectAllFields } from "@/lib/dashboard/field-detection";
 import { extractNumericValue } from "@/lib/dashboard/formatting";
+import {
+    buildInvoicesRequiredVsSent,
+    buildMontosVsProbabilidad,
+    buildRiskDistribution,
+    buildPipelineFunnel,
+} from "@/lib/dashboard/chart-builders";
 import type { DashboardDataResponse } from "@/lib/dashboard/types";
 
 export async function GET() {
@@ -33,6 +39,12 @@ export async function GET() {
         const kpis = buildKpis(state.rows, fields);
         const { stats, charts, summary } = buildAnalytics(state.rows, state.columns);
 
+        // Fallback robusto para gráficos problemáticos usando helpers directos sobre rows
+        const invoicesRequiredVsSent = buildInvoicesRequiredVsSent(state.rows);
+        const montosVsProbabilidad = buildMontosVsProbabilidad(state.rows);
+        const riskDistribution = buildRiskDistribution(state.rows);
+        const pipelineFunnel = buildPipelineFunnel(state.rows);
+
         const response: DashboardDataResponse = {
             ok: true,
             rows: state.rows,
@@ -45,12 +57,26 @@ export async function GET() {
             },
             kpis,
             statistics: stats,
-            charts,
+            charts: {
+                ...charts,
+                invoicesRequiredVsSent,
+                montosVsProbabilidad,
+                riskDistribution,
+                pipelineFunnel,
+            },
             executiveSummary: summary,
             logs: state.logs,
             lastSync: state.lastSync,
             hash: state.hash,
             lastFetchedAt: new Date().toISOString(),
+            diagnostics: {
+                totalRows: state.rows.length,
+                invoicesRequiredVsSentCount: invoicesRequiredVsSent.length,
+                montosVsProbabilidadCount: montosVsProbabilidad.length,
+                riskDistributionCount: riskDistribution.length,
+                pipelineFunnelCount: pipelineFunnel.length,
+                sampleRow: state.rows[0],
+            },
         };
 
         return NextResponse.json(response);
