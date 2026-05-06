@@ -1,58 +1,67 @@
 import { NextResponse } from "next/server";
 
 export async function POST() {
-    const webhookUrl = process.env.N8N_REFRESH_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_REFRESH_WEBHOOK_URL;
+  const refreshSecret = process.env.N8N_REFRESH_SECRET;
 
-    if (!webhookUrl) {
-        return NextResponse.json(
-            {
-                ok: false,
-                message:
-                    "N8N_REFRESH_WEBHOOK_URL no está configurada. Agrega esta variable al archivo .env.local para habilitar el refresh manual desde n8n.",
-            },
-            { status: 503 }
-        );
-    }
+  if (!webhookUrl) {
+    return NextResponse.json(
+      { ok: false, error: "N8N_REFRESH_WEBHOOK_URL no está definida" },
+      { status: 500 }
+    );
+  }
 
-    try {
-        const res = await fetch(webhookUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                ...(process.env.N8N_REFRESH_SECRET
-                    ? { "x-n8n-secret": process.env.N8N_REFRESH_SECRET }
-                    : {}),
-            },
-            body: JSON.stringify({
-                action: "refresh_dashboard",
-                requestedAt: new Date().toISOString(),
-                source: "dashboard_ui",
-            }),
-        });
+  if (!refreshSecret) {
+    return NextResponse.json(
+      { ok: false, error: "N8N_REFRESH_SECRET no está definida" },
+      { status: 500 }
+    );
+  }
 
-        if (!res.ok) {
-            const text = await res.text();
-            return NextResponse.json(
-                {
-                    ok: false,
-                    message: `n8n respondió con error ${res.status}: ${text}`,
-                },
-                { status: 502 }
-            );
-        }
+  const response = await fetch(webhookUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-refresh-secret": refreshSecret,
+    },
+    body: JSON.stringify({
+      event: "manual_refresh_requested",
+      source: "dashboard",
+      requestedAt: new Date().toISOString(),
 
-        return NextResponse.json({
-            ok: true,
-            message: "Solicitud enviada a n8n exitosamente",
-        });
-    } catch (error) {
-        const msg = error instanceof Error ? error.message : "Error de red";
-        return NextResponse.json(
-            {
-                ok: false,
-                message: `No se pudo contactar a n8n: ${msg}`,
-            },
-            { status: 502 }
-        );
-    }
+      // Redundancia por si el header no llega a n8n
+      refreshSecret,
+      secret: refreshSecret,
+    }),
+    cache: "no-store",
+  });
+
+  const text = await response.text();
+
+  let data: unknown;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!response.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "n8n rechazó la actualización manual",
+        status: response.status,
+        details: data,
+      },
+      { status: response.status }
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    message: "Actualización solicitada a n8n",
+    n8n: data,
+    requestedAt: new Date().toISOString(),
+  });
 }
