@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Sora } from "next/font/google";
 import "./globals.css";
+import SalesChatbot from "@/components/chatbot/SalesChatbot";
 
 const sora = Sora({
   subsets: ["latin"],
@@ -22,6 +23,7 @@ export default function RootLayout({
     <html lang="es" className={sora.variable}>
       <body className="min-h-screen bg-(--background) text-(--foreground) antialiased">
         {children}
+        <SalesChatbot />
       </body>
     </html>
   );
