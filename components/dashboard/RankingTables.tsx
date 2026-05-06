@@ -101,13 +101,13 @@ function RankingTable({ data, title, format }: { data: { name: string; value: nu
 export default function RankingTables({ stats }: { stats: DashboardStatistics }) {
     return (
         <div className="grid gap-6 lg:grid-cols-2">
-            <RankingBar data={stats.rankings.topSellersByRevenue} title="Top vendedores por ingresos" format="currency" />
-            <RankingTable data={stats.rankings.topSellersByConversion} title="Top vendedores por conversión" format="percent" />
-            <RankingBar data={stats.rankings.topChannelsByRevenue} title="Top canales por ingresos" format="currency" />
-            <RankingBar data={stats.rankings.topCitiesByRevenue} title="Top ciudades por ingresos" format="currency" />
-            <RankingTable data={stats.rankings.topCampaignsByRevenue} title="Top campañas por ingresos" format="currency" />
-            <RankingTable data={stats.rankings.topProductsByRevenue} title="Top productos por ingresos" format="currency" />
-            <RankingTable data={stats.rankings.topClientsByAmount} title="Top clientes por monto" format="currency" />
+            <RankingBar data={stats.rankings.topSellersByRevenue} title="Top asesores comerciales" format="currency" />
+            <RankingTable data={stats.rankings.topSellersByConversion} title="Top asesores por conversión" format="percent" />
+            <RankingBar data={stats.rankings.topChannelsByRevenue} title="Top canales de leads" format="currency" />
+            <RankingBar data={stats.rankings.topCitiesByRevenue} title="Top ciudades por ventas" format="currency" />
+            <RankingTable data={stats.rankings.topCampaignsByRevenue} title="Top campañas comerciales" format="currency" />
+            <RankingTable data={stats.rankings.topProductsByRevenue} title="Top categorías de vehículo" format="currency" />
+            <RankingTable data={stats.rankings.topClientsByAmount} title="Top clientes / prospectos" format="currency" />
         </div>
     );
 }

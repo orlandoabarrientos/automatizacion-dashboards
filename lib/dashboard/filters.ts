@@ -40,6 +40,12 @@ export function applyDashboardFilters(rows: ParsedRow[], filters: DashboardFilte
             if (!val.includes(filters.estado.toLowerCase())) return false;
         }
 
+        // Etapa pipeline
+        if (filters.etapaPipeline && fields.etapaPipeline) {
+            const val = String(row[fields.etapaPipeline] ?? "").trim().toLowerCase();
+            if (!val.includes(filters.etapaPipeline.toLowerCase())) return false;
+        }
+
         // Canal
         if (filters.canal && fields.canal) {
             const val = String(row[fields.canal] ?? "").trim().toLowerCase();
@@ -50,6 +56,12 @@ export function applyDashboardFilters(rows: ParsedRow[], filters: DashboardFilte
         if (filters.vendedor && fields.vendedor) {
             const val = String(row[fields.vendedor] ?? "").trim().toLowerCase();
             if (!val.includes(filters.vendedor.toLowerCase())) return false;
+        }
+
+        // Equipo ventas
+        if (filters.equipoVentas && fields.equipoVentas) {
+            const val = String(row[fields.equipoVentas] ?? "").trim().toLowerCase();
+            if (!val.includes(filters.equipoVentas.toLowerCase())) return false;
         }
 
         // Ciudad
@@ -70,10 +82,34 @@ export function applyDashboardFilters(rows: ParsedRow[], filters: DashboardFilte
             if (!val.includes(filters.campana.toLowerCase())) return false;
         }
 
+        // Marca
+        if (filters.marca && fields.marca) {
+            const val = String(row[fields.marca] ?? "").trim().toLowerCase();
+            if (!val.includes(filters.marca.toLowerCase())) return false;
+        }
+
+        // Modelo
+        if (filters.modelo && fields.modelo) {
+            const val = String(row[fields.modelo] ?? "").trim().toLowerCase();
+            if (!val.includes(filters.modelo.toLowerCase())) return false;
+        }
+
+        // Año vehículo
+        if (filters.anoVehiculo && fields.anoVehiculo) {
+            const val = String(row[fields.anoVehiculo] ?? "").trim().toLowerCase();
+            if (!val.includes(filters.anoVehiculo.toLowerCase())) return false;
+        }
+
         // Producto categoría
         if (filters.productoCategoria && fields.productoCategoria) {
             const val = String(row[fields.productoCategoria] ?? "").trim().toLowerCase();
             if (!val.includes(filters.productoCategoria.toLowerCase())) return false;
+        }
+
+        // Tipo operación
+        if (filters.tipoOperacion && fields.tipoOperacion) {
+            const val = String(row[fields.tipoOperacion] ?? "").trim().toLowerCase();
+            if (!val.includes(filters.tipoOperacion.toLowerCase())) return false;
         }
 
         // Temperatura lead
@@ -92,6 +128,28 @@ export function applyDashboardFilters(rows: ParsedRow[], filters: DashboardFilte
         if (filters.riesgoChurn && fields.riesgoChurn) {
             const val = String(row[fields.riesgoChurn] ?? "").trim().toLowerCase();
             if (!val.includes(filters.riesgoChurn.toLowerCase())) return false;
+        }
+
+        // Financiamiento
+        if (filters.financiamiento && fields.financiamiento) {
+            const boolVal = extractBooleanValue(row[fields.financiamiento]);
+            const filterBool = filters.financiamiento === "true";
+            if (boolVal === null) return false;
+            if (boolVal !== filterBool) return false;
+        }
+
+        // Banco financiador
+        if (filters.bancoFinanciador && fields.bancoFinanciador) {
+            const val = String(row[fields.bancoFinanciador] ?? "").trim().toLowerCase();
+            if (!val.includes(filters.bancoFinanciador.toLowerCase())) return false;
+        }
+
+        // Test drive
+        if (filters.testDrive && fields.testDrive) {
+            const boolVal = extractBooleanValue(row[fields.testDrive]);
+            const filterBool = filters.testDrive === "true";
+            if (boolVal === null) return false;
+            if (boolVal !== filterBool) return false;
         }
 
         // Factura enviada
@@ -116,6 +174,15 @@ export function applyDashboardFilters(rows: ParsedRow[], filters: DashboardFilte
             if (numeric !== null) {
                 if (filters.montoMin !== null && numeric < filters.montoMin) return false;
                 if (filters.montoMax !== null && numeric > filters.montoMax) return false;
+            }
+        }
+
+        // Margen min/max
+        if (fields.margenUsd) {
+            const numeric = extractNumericValue(row[fields.margenUsd]);
+            if (numeric !== null) {
+                if (filters.margenMin !== null && numeric < filters.margenMin) return false;
+                if (filters.margenMax !== null && numeric > filters.margenMax) return false;
             }
         }
 

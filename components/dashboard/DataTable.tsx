@@ -304,21 +304,65 @@ export default function DataTable({ rows, columns }: DataTableProps) {
             {/* Detail Dialog */}
             <Dialog open={!!selectedRow} onClose={() => setSelectedRow(null)}>
                 <DialogHeader>
-                    <DialogTitle>Detalle de registro</DialogTitle>
+                    <DialogTitle>Detalle de oportunidad</DialogTitle>
                 </DialogHeader>
                 <DialogContent>
-                    {selectedRow && (
-                        <div className="space-y-2">
-                            {Object.entries(selectedRow).map(([key, value]) => (
+                    {selectedRow && <DealershipDetail row={selectedRow} />}
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}
+
+function DealershipDetail({ row }: { row: ParsedRow }) {
+    const sections: { title: string; fields: string[] }[] = [
+        {
+            title: "Cliente",
+            fields: ["cliente_nombre", "cliente_id", "tipo_cliente", "segmento", "ciudad", "estado_region"],
+        },
+        {
+            title: "Vehículo / operación",
+            fields: ["producto_categoria", "marca", "modelo", "año_vehiculo", "tipo_operacion", "cantidad"],
+        },
+        {
+            title: "Comercial",
+            fields: ["vendedor", "equipo_ventas", "sucursal", "canal", "campaña", "etapa_pipeline", "estado", "prioridad", "temperatura_lead", "probabilidad_cierre", "dias_en_pipeline"],
+        },
+        {
+            title: "Financiero",
+            fields: ["precio_lista_usd", "descuento_usd", "monto", "costo_estimado_usd", "margen_usd", "margen_pct", "monto_bs", "tasa_usdt", "metodo_pago", "financiamiento", "banco_financiador"],
+        },
+        {
+            title: "Operación",
+            fields: ["test_drive", "factura_requerida", "factura_enviada", "cumplimiento_sla", "tiempo_respuesta_min", "llamadas_realizadas", "mensajes_enviados"],
+        },
+        {
+            title: "Postventa / seguimiento",
+            fields: ["satisfaccion_cliente", "riesgo_churn", "responsable_postventa", "proxima_accion", "observaciones"],
+        },
+    ];
+
+    return (
+        <div className="space-y-4">
+            {sections.map((section) => {
+                const entries: [string, unknown][] = section.fields
+                    .map((f): [string, unknown] => [f, row[f]])
+                    .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
+                if (entries.length === 0) return null;
+                return (
+                    <div key={section.title}>
+                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-(--accent)">{section.title}</h4>
+                        <div className="space-y-1.5">
+                            {entries.map(([key, value]) => (
                                 <div key={key} className="flex justify-between gap-4 rounded-lg border border-(--border) px-3 py-2">
                                     <span className="text-xs font-medium text-(--muted-foreground)">{key}</span>
                                     <span className="text-right text-sm text-(--foreground)">{formatCell(key, value)}</span>
                                 </div>
                             ))}
                         </div>
-                    )}
-                </DialogContent>
-            </Dialog>
+                    </div>
+                );
+            })}
         </div>
     );
 }

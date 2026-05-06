@@ -101,8 +101,13 @@ export function buildKpis(rows: ParsedRow[], fields: FieldMap): KpiItem[] {
     let mediumRiskCount = 0;
     let lowRiskCount = 0;
     let testDriveCount = 0;
+    let financingCount = 0;
     let totalCalls = 0;
     let totalMessages = 0;
+    let totalDiscount = 0;
+    let discountCount = 0;
+    let totalPriceList = 0;
+    let priceListCount = 0;
 
     // Trackers for tops
     const sellerRevenue: Record<string, number> = {};
@@ -112,6 +117,9 @@ export function buildKpis(rows: ParsedRow[], fields: FieldMap): KpiItem[] {
     const productRevenue: Record<string, number> = {};
     const clientAmount: Record<string, number> = {};
     const branchConversion: Record<string, { total: number; won: number }> = {};
+    const brandRevenue: Record<string, number> = {};
+    const modelRevenue: Record<string, number> = {};
+    const bankCount: Record<string, number> = {};
 
     for (const row of rows) {
         const status = fields.estado ? String(row[fields.estado] ?? "").trim() : "";
@@ -123,6 +131,8 @@ export function buildKpis(rows: ParsedRow[], fields: FieldMap): KpiItem[] {
         const satisfaccion = fields.satisfaccionCliente ? extractNumericValue(row[fields.satisfaccionCliente]) : null;
         const calls = fields.llamadasRealizadas ? extractNumericValue(row[fields.llamadasRealizadas]) : null;
         const msgs = fields.mensajesEnviados ? extractNumericValue(row[fields.mensajesEnviados]) : null;
+        const descuento = fields.descuentoUsd ? extractNumericValue(row[fields.descuentoUsd]) : null;
+        const precioLista = fields.precioListaUsd ? extractNumericValue(row[fields.precioListaUsd]) : null;
 
         if (isOpenStatus(status)) openCount++;
         if (isWinStatus(status)) wonCount++;
@@ -175,6 +185,14 @@ export function buildKpis(rows: ParsedRow[], fields: FieldMap): KpiItem[] {
                 const cl = String(row[fields.clienteNombre] ?? "Sin dato").trim() || "Sin dato";
                 clientAmount[cl] = (clientAmount[cl] ?? 0) + monto;
             }
+            if (fields.marca) {
+                const b = String(row[fields.marca] ?? "Sin dato").trim() || "Sin dato";
+                brandRevenue[b] = (brandRevenue[b] ?? 0) + monto;
+            }
+            if (fields.modelo) {
+                const m = String(row[fields.modelo] ?? "Sin dato").trim() || "Sin dato";
+                modelRevenue[m] = (modelRevenue[m] ?? 0) + monto;
+            }
         }
 
         if (margen !== null) {
@@ -222,6 +240,16 @@ export function buildKpis(rows: ParsedRow[], fields: FieldMap): KpiItem[] {
             if (td === true) testDriveCount++;
         }
 
+        if (fields.financiamiento) {
+            const fin = extractBooleanValue(row[fields.financiamiento]);
+            if (fin === true) financingCount++;
+        }
+
+        if (fields.bancoFinanciador) {
+            const bank = String(row[fields.bancoFinanciador] ?? "").trim();
+            if (bank) bankCount[bank] = (bankCount[bank] ?? 0) + 1;
+        }
+
         if (satisfaccion !== null) {
             totalSatisfaction += satisfaccion;
             satisfactionCount++;
@@ -229,6 +257,14 @@ export function buildKpis(rows: ParsedRow[], fields: FieldMap): KpiItem[] {
 
         if (calls !== null) totalCalls += calls;
         if (msgs !== null) totalMessages += msgs;
+        if (descuento !== null) {
+            totalDiscount += descuento;
+            discountCount++;
+        }
+        if (precioLista !== null) {
+            totalPriceList += precioLista;
+            priceListCount++;
+        }
 
         if (fields.sucursal && fields.estado) {
             const b = String(row[fields.sucursal] ?? "Sin dato").trim() || "Sin dato";
@@ -251,6 +287,10 @@ export function buildKpis(rows: ParsedRow[], fields: FieldMap): KpiItem[] {
     const avgSatisfaction = satisfactionCount > 0 ? totalSatisfaction / satisfactionCount : 0;
     const avgCalls = totalRows > 0 ? totalCalls / totalRows : 0;
     const avgMessages = totalRows > 0 ? totalMessages / totalRows : 0;
+    const testDriveRate = totalRows > 0 ? testDriveCount / totalRows : 0;
+    const financingRate = totalRows > 0 ? financingCount / totalRows : 0;
+    const avgDiscount = discountCount > 0 ? totalDiscount / discountCount : 0;
+    const totalDiscountAmount = totalDiscount;
 
     const topSeller = Object.entries(sellerRevenue).sort((a, b) => b[1] - a[1])[0];
     const topChannel = Object.entries(channelRevenue).sort((a, b) => b[1] - a[1])[0];
@@ -262,6 +302,9 @@ export function buildKpis(rows: ParsedRow[], fields: FieldMap): KpiItem[] {
         const rateB = b[1].total > 0 ? b[1].won / b[1].total : 0;
         return rateB - rateA;
     })[0];
+    const topBrand = Object.entries(brandRevenue).sort((a, b) => b[1] - a[1])[0];
+    const topModel = Object.entries(modelRevenue).sort((a, b) => b[1] - a[1])[0];
+    const topBank = Object.entries(bankCount).sort((a, b) => b[1] - a[1])[0];
 
     const fmt = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
     const fmtCur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -269,46 +312,73 @@ export function buildKpis(rows: ParsedRow[], fields: FieldMap): KpiItem[] {
 
     const kpis: KpiItem[] = [];
 
-    kpis.push(makeKpi("total_rows", "Total registros", totalRows, fmt.format(totalRows), "Total de oportunidades en el dataset", "sales", "neutral"));
-    kpis.push(makeKpi("open_opps", "Oportunidades abiertas", openCount, fmt.format(openCount), "Oportunidades en etapas abiertas", "pipeline", openCount > 0 ? "warning" : "neutral"));
-    kpis.push(makeKpi("won_sales", "Ventas ganadas", wonCount, fmt.format(wonCount), "Oportunidades cerradas ganadas", "sales", wonCount > 0 ? "good" : "neutral"));
-    kpis.push(makeKpi("invoiced_sales", "Ventas facturadas", invoicedCount, fmt.format(invoicedCount), "Ventas ganadas con factura enviada", "revenue", invoicedCount > 0 ? "good" : "neutral"));
-    kpis.push(makeKpi("lost_sales", "Ventas perdidas", lostCount, fmt.format(lostCount), "Oportunidades cerradas perdidas", "sales", lostCount > 0 ? "danger" : "neutral"));
-    kpis.push(makeKpi("conversion_rate", "Tasa de conversión", conversionRate, fmtPct.format(conversionRate), "Porcentaje de oportunidades ganadas sobre total", "sales", conversionRate >= 0.25 ? "good" : conversionRate >= 0.15 ? "warning" : "danger"));
-    kpis.push(makeKpi("total_revenue", "Ingresos totales USD", totalAmount, fmtCur.format(totalAmount), "Suma de montos de todas las oportunidades", "revenue", totalAmount > 0 ? "good" : "neutral"));
-    kpis.push(makeKpi("won_revenue", "Ingresos ganados USD", wonAmount, fmtCur.format(wonAmount), "Suma de montos de oportunidades ganadas", "revenue", wonAmount > 0 ? "good" : "neutral"));
-    kpis.push(makeKpi("total_bs", "Monto total Bs", null, "—", "Requiere campo monto_bs", "revenue", "neutral")); // Placeholder if not present; we can compute if field exists but user asked for 40 KPIs
-    kpis.push(makeKpi("avg_ticket", "Ticket promedio", avgTicket, fmtCur.format(avgTicket), "Monto promedio por oportunidad", "revenue", avgTicket > 0 ? "good" : "neutral"));
-    kpis.push(makeKpi("avg_ticket_won", "Ticket promedio ganado", avgTicketWon, fmtCur.format(avgTicketWon), "Monto promedio de oportunidades ganadas", "revenue", avgTicketWon > 0 ? "good" : "neutral"));
-    kpis.push(makeKpi("gross_margin_usd", "Margen bruto USD", totalMargin, fmtCur.format(totalMargin), "Suma de márgenes en dólares", "revenue", totalMargin > 0 ? "good" : "neutral"));
-    kpis.push(makeKpi("avg_margin_pct", "Margen bruto promedio %", avgMarginPct, fmtPct.format(avgMarginPct), "Margen promedio ponderado", "revenue", avgMarginPct >= 0.15 ? "good" : avgMarginPct >= 0.08 ? "warning" : "danger"));
-    kpis.push(makeKpi("pipeline_total", "Pipeline total", pipelineAmount, fmtCur.format(pipelineAmount), "Monto de oportunidades abiertas", "pipeline", pipelineAmount > 0 ? "warning" : "neutral"));
+    // VENTAS
+    kpis.push(makeKpi("total_rows", "Total de oportunidades", totalRows, fmt.format(totalRows), "Oportunidades de venta en el sistema", "sales", "neutral"));
+    kpis.push(makeKpi("open_opps", "Oportunidades activas", openCount, fmt.format(openCount), "Operaciones en curso", "pipeline", openCount > 0 ? "warning" : "neutral"));
+    kpis.push(makeKpi("won_sales", "Ventas ganadas", wonCount, fmt.format(wonCount), "Operaciones cerradas exitosamente", "sales", wonCount > 0 ? "good" : "neutral"));
+    kpis.push(makeKpi("invoiced_sales", "Operaciones facturadas", invoicedCount, fmt.format(invoicedCount), "Ventas ganadas con factura enviada", "revenue", invoicedCount > 0 ? "good" : "neutral"));
+    kpis.push(makeKpi("lost_sales", "Operaciones perdidas", lostCount, fmt.format(lostCount), "Oportunidades cerradas perdidas", "sales", lostCount > 0 ? "danger" : "neutral"));
+    kpis.push(makeKpi("conversion_rate", "Tasa de cierre", conversionRate, fmtPct.format(conversionRate), "% de operaciones ganadas sobre total", "sales", conversionRate >= 0.25 ? "good" : conversionRate >= 0.15 ? "warning" : "danger"));
+
+    // REVENUE
+    kpis.push(makeKpi("total_revenue", "Monto total cotizado USD", totalAmount, fmtCur.format(totalAmount), "Suma de montos de todas las operaciones", "revenue", totalAmount > 0 ? "good" : "neutral"));
+    kpis.push(makeKpi("won_revenue", "Monto ganado USD", wonAmount, fmtCur.format(wonAmount), "Suma de montos de operaciones ganadas", "revenue", wonAmount > 0 ? "good" : "neutral"));
+    kpis.push(makeKpi("invoiced_revenue", "Monto facturado USD", wonAmount, fmtCur.format(wonAmount), "Ventas con factura enviada", "revenue", wonAmount > 0 ? "good" : "neutral"));
+    kpis.push(makeKpi("avg_ticket", "Valor promedio por operación", avgTicket, fmtCur.format(avgTicket), "Monto promedio de todas las oportunidades", "revenue", avgTicket > 0 ? "good" : "neutral"));
+    kpis.push(makeKpi("avg_ticket_won", "Valor promedio venta ganada", avgTicketWon, fmtCur.format(avgTicketWon), "Monto promedio de operaciones ganadas", "revenue", avgTicketWon > 0 ? "good" : "neutral"));
+
+    // MARGEN
+    kpis.push(makeKpi("gross_margin_usd", "Margen bruto total USD", totalMargin, fmtCur.format(totalMargin), "Suma de márgenes en dólares", "margin", totalMargin > 0 ? "good" : "neutral"));
+    kpis.push(makeKpi("avg_margin_pct", "Margen bruto promedio %", avgMarginPct, fmtPct.format(avgMarginPct), "Margen promedio ponderado", "margin", avgMarginPct >= 0.15 ? "good" : avgMarginPct >= 0.08 ? "warning" : "danger"));
+    kpis.push(makeKpi("total_discount", "Descuento total aplicado", totalDiscountAmount, fmtCur.format(totalDiscountAmount), "Suma de descuentos concedidos", "margin", totalDiscountAmount > 0 ? "warning" : "good"));
+    kpis.push(makeKpi("avg_discount", "Descuento promedio", avgDiscount, fmtCur.format(avgDiscount), "Descuento medio por operación", "margin", avgDiscount > 0 ? "warning" : "good"));
+
+    // PIPELINE
+    kpis.push(makeKpi("pipeline_total", "Pipeline total abierto", pipelineAmount, fmtCur.format(pipelineAmount), "Monto de oportunidades activas", "pipeline", pipelineAmount > 0 ? "warning" : "neutral"));
     kpis.push(makeKpi("pipeline_weighted", "Pipeline ponderado", weightedPipeline, fmtCur.format(weightedPipeline), "Pipeline ponderado por probabilidad de cierre", "pipeline", weightedPipeline > 0 ? "warning" : "neutral"));
-    kpis.push(makeKpi("avg_prob", "Probabilidad promedio", avgProb, fmtPct.format(avgProb), "Probabilidad media de cierre", "pipeline", avgProb >= 0.5 ? "good" : avgProb >= 0.3 ? "warning" : "danger"));
-    kpis.push(makeKpi("avg_days_pipeline", "Días promedio en pipeline", avgDays, fmt.format(avgDays), "Tiempo medio desde creación hasta cierre", "pipeline", avgDays <= 30 ? "good" : avgDays <= 60 ? "warning" : "danger"));
-    kpis.push(makeKpi("avg_response", "Tiempo promedio respuesta", avgResponse, `${fmt.format(avgResponse)} min`, "Tiempo medio de respuesta al cliente en minutos", "operations", avgResponse <= 30 ? "good" : avgResponse <= 120 ? "warning" : "danger"));
-    kpis.push(makeKpi("sla_compliance", "Cumplimiento SLA", slaPct, fmtPct.format(slaPct), "Porcentaje de oportunidades dentro del SLA", "operations", slaPct >= 0.9 ? "good" : slaPct >= 0.7 ? "warning" : "danger"));
-    kpis.push(makeKpi("invoices_required", "Facturas requeridas", invoicesRequired, fmt.format(invoicesRequired), "Oportunidades que requieren factura", "operations", "neutral"));
+    kpis.push(makeKpi("avg_prob", "Probabilidad promedio de cierre", avgProb, fmtPct.format(avgProb), "Probabilidad media de cierre", "pipeline", avgProb >= 0.5 ? "good" : avgProb >= 0.3 ? "warning" : "danger"));
+    kpis.push(makeKpi("avg_days_pipeline", "Días promedio en embudo", avgDays, fmt.format(avgDays), "Tiempo medio desde creación hasta cierre", "pipeline", avgDays <= 30 ? "good" : avgDays <= 60 ? "warning" : "danger"));
+
+    // VEHICLE
+    kpis.push(makeKpi("test_drives", "Test drives realizados", testDriveCount, fmt.format(testDriveCount), "Pruebas de manejo realizadas", "vehicle", testDriveCount > 0 ? "good" : "neutral"));
+    kpis.push(makeKpi("test_drive_rate", "Tasa de test drive", testDriveRate, fmtPct.format(testDriveRate), "% de oportunidades con test drive", "vehicle", testDriveRate >= 0.3 ? "good" : testDriveRate >= 0.1 ? "warning" : "neutral"));
+
+    // FINANCING
+    kpis.push(makeKpi("financing_count", "Operaciones con financiamiento", financingCount, fmt.format(financingCount), "Ventas que requieren financiamiento", "financing", financingCount > 0 ? "good" : "neutral"));
+    kpis.push(makeKpi("financing_rate", "Tasa de financiamiento", financingRate, fmtPct.format(financingRate), "% de operaciones con financiamiento", "financing", financingRate > 0 ? "good" : "neutral"));
+
+    // OPERATIONS
+    kpis.push(makeKpi("avg_response", "Tiempo promedio de respuesta", avgResponse, `${fmt.format(avgResponse)} min`, "Tiempo medio de respuesta al cliente en minutos", "operations", avgResponse <= 30 ? "good" : avgResponse <= 120 ? "warning" : "danger"));
+    kpis.push(makeKpi("sla_compliance", "Cumplimiento SLA comercial", slaPct, fmtPct.format(slaPct), "% de operaciones dentro del SLA comercial", "operations", slaPct >= 0.9 ? "good" : slaPct >= 0.7 ? "warning" : "danger"));
+    kpis.push(makeKpi("invoices_required", "Facturas requeridas", invoicesRequired, fmt.format(invoicesRequired), "Operaciones que requieren factura", "operations", "neutral"));
     kpis.push(makeKpi("invoices_sent", "Facturas enviadas", invoicesSent, fmt.format(invoicesSent), "Facturas ya enviadas", "operations", invoicesSent >= invoicesRequired ? "good" : "warning"));
     kpis.push(makeKpi("invoices_pending", "Facturas pendientes", pendingInvoices, fmt.format(pendingInvoices), "Facturas requeridas pero no enviadas", "operations", pendingInvoices === 0 ? "good" : "danger"));
-    kpis.push(makeKpi("invoice_rate", "Tasa de facturación", invoiceRate, fmtPct.format(invoiceRate), "Porcentaje de facturas enviadas vs requeridas", "operations", invoiceRate >= 0.9 ? "good" : invoiceRate >= 0.6 ? "warning" : "danger"));
-    kpis.push(makeKpi("hot_leads", "Leads calientes", hotLeads, fmt.format(hotLeads), "Leads con temperatura alta", "customer", hotLeads > 0 ? "good" : "neutral"));
-    kpis.push(makeKpi("warm_leads", "Leads tibios", warmLeads, fmt.format(warmLeads), "Leads con temperatura media", "customer", "neutral"));
-    kpis.push(makeKpi("cold_leads", "Leads fríos", coldLeads, fmt.format(coldLeads), "Leads con temperatura baja", "customer", coldLeads > hotLeads ? "warning" : "neutral"));
+    kpis.push(makeKpi("invoice_rate", "Tasa de facturación", invoiceRate, fmtPct.format(invoiceRate), "% de facturas enviadas vs requeridas", "operations", invoiceRate >= 0.9 ? "good" : invoiceRate >= 0.6 ? "warning" : "danger"));
+
+    // CUSTOMER
+    kpis.push(makeKpi("hot_leads", "Leads calientes", hotLeads, fmt.format(hotLeads), "Prospectos con temperatura alta", "customer", hotLeads > 0 ? "good" : "neutral"));
+    kpis.push(makeKpi("warm_leads", "Leads tibios", warmLeads, fmt.format(warmLeads), "Prospectos con temperatura media", "customer", "neutral"));
+    kpis.push(makeKpi("cold_leads", "Leads fríos", coldLeads, fmt.format(coldLeads), "Prospectos con temperatura baja", "customer", coldLeads > hotLeads ? "warning" : "neutral"));
     kpis.push(makeKpi("avg_satisfaction", "Satisfacción promedio", avgSatisfaction, fmt.format(avgSatisfaction), "Puntuación media de satisfacción del cliente", "customer", avgSatisfaction >= 4 ? "good" : avgSatisfaction >= 3 ? "warning" : "danger"));
-    kpis.push(makeKpi("high_risk", "Riesgo alto", highRiskCount, fmt.format(highRiskCount), "Clientes/oportunidades con riesgo alto de churn", "risk", highRiskCount > 0 ? "danger" : "good"));
-    kpis.push(makeKpi("medium_risk", "Riesgo medio", mediumRiskCount, fmt.format(mediumRiskCount), "Clientes/oportunidades con riesgo medio de churn", "risk", "neutral"));
-    kpis.push(makeKpi("low_risk", "Riesgo bajo", lowRiskCount, fmt.format(lowRiskCount), "Clientes/oportunidades con riesgo bajo de churn", "risk", "good"));
-    kpis.push(makeKpi("test_drives", "Test drives", testDriveCount, fmt.format(testDriveCount), "Cantidad de test drives realizados", "sales", testDriveCount > 0 ? "good" : "neutral"));
-    kpis.push(makeKpi("lost_amount", "Monto perdido", lostAmount, fmtCur.format(lostAmount), "Valor de oportunidades perdidas", "revenue", lostAmount > 0 ? "danger" : "good"));
-    kpis.push(makeKpi("top_seller", "Top vendedor", null, topSeller?.[0] ?? "—", topSeller ? `${fmtCur.format(topSeller[1])} en ingresos` : "Sin datos", "sales", topSeller ? "good" : "neutral"));
-    kpis.push(makeKpi("top_channel", "Top canal", null, topChannel?.[0] ?? "—", topChannel ? `${fmtCur.format(topChannel[1])} en ingresos` : "Sin datos", "sales", topChannel ? "good" : "neutral"));
-    kpis.push(makeKpi("top_city", "Top ciudad", null, topCity?.[0] ?? "—", topCity ? `${fmtCur.format(topCity[1])} en ingresos` : "Sin datos", "sales", topCity ? "good" : "neutral"));
-    kpis.push(makeKpi("top_campaign", "Top campaña", null, topCampaign?.[0] ?? "—", topCampaign ? `${fmtCur.format(topCampaign[1])} en ingresos` : "Sin datos", "sales", topCampaign ? "good" : "neutral"));
-    kpis.push(makeKpi("top_product", "Producto más vendido", null, topProduct?.[0] ?? "—", topProduct ? `${fmtCur.format(topProduct[1])} en ingresos` : "Sin datos", "sales", topProduct ? "good" : "neutral"));
-    kpis.push(makeKpi("top_branch", "Mejor sucursal", null, topBranchEntry?.[0] ?? "—", topBranchEntry ? `${fmtPct.format(topBranchEntry[1].total > 0 ? topBranchEntry[1].won / topBranchEntry[1].total : 0)} conversión` : "Sin datos", "sales", topBranchEntry ? "good" : "neutral"));
+
+    // RISK
+    kpis.push(makeKpi("high_risk", "Riesgo alto de pérdida", highRiskCount, fmt.format(highRiskCount), "Oportunidades con riesgo alto de churn", "risk", highRiskCount > 0 ? "danger" : "good"));
+    kpis.push(makeKpi("medium_risk", "Riesgo medio", mediumRiskCount, fmt.format(mediumRiskCount), "Oportunidades con riesgo medio de churn", "risk", "neutral"));
+    kpis.push(makeKpi("low_risk", "Riesgo bajo", lowRiskCount, fmt.format(lowRiskCount), "Oportunidades con riesgo bajo de churn", "risk", "good"));
+
+    // ADVISOR / TOPs
+    kpis.push(makeKpi("top_seller", "Top asesor comercial", null, topSeller?.[0] ?? "—", topSeller ? `${fmtCur.format(topSeller[1])} en ventas` : "Sin datos", "advisor", topSeller ? "good" : "neutral"));
+    kpis.push(makeKpi("top_branch", "Top sucursal", null, topBranchEntry?.[0] ?? "—", topBranchEntry ? `${fmtPct.format(topBranchEntry[1].total > 0 ? topBranchEntry[1].won / topBranchEntry[1].total : 0)} conversión` : "Sin datos", "advisor", topBranchEntry ? "good" : "neutral"));
+    kpis.push(makeKpi("top_brand", "Top marca", null, topBrand?.[0] ?? "—", topBrand ? `${fmtCur.format(topBrand[1])} en ventas` : "Sin datos", "vehicle", topBrand ? "good" : "neutral"));
+    kpis.push(makeKpi("top_model", "Top modelo", null, topModel?.[0] ?? "—", topModel ? `${fmtCur.format(topModel[1])} en ventas` : "Sin datos", "vehicle", topModel ? "good" : "neutral"));
+    kpis.push(makeKpi("top_bank", "Banco más usado", null, topBank?.[0] ?? "—", topBank ? `${topBank[1]} operaciones` : "Sin datos", "financing", topBank ? "good" : "neutral"));
+    kpis.push(makeKpi("top_product", "Categoría más vendida", null, topProduct?.[0] ?? "—", topProduct ? `${fmtCur.format(topProduct[1])} en ventas` : "Sin datos", "vehicle", topProduct ? "good" : "neutral"));
+    kpis.push(makeKpi("top_channel", "Canal con más leads", null, topChannel?.[0] ?? "—", topChannel ? `${fmtCur.format(topChannel[1])} en ventas` : "Sin datos", "advisor", topChannel ? "good" : "neutral"));
+
+    // Extra ops
     kpis.push(makeKpi("avg_calls", "Promedio llamadas", avgCalls, fmt.format(avgCalls), "Llamadas promedio por oportunidad", "operations", "neutral"));
     kpis.push(makeKpi("avg_messages", "Promedio mensajes", avgMessages, fmt.format(avgMessages), "Mensajes promedio por oportunidad", "operations", "neutral"));
+    kpis.push(makeKpi("lost_amount", "Monto perdido", lostAmount, fmtCur.format(lostAmount), "Valor de oportunidades perdidas", "revenue", lostAmount > 0 ? "danger" : "good"));
 
     return kpis;
 }

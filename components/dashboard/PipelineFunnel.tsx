@@ -24,7 +24,7 @@ export default function PipelineFunnel({ charts }: { charts: DashboardCharts }) 
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Embudo comercial</CardTitle>
+                <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Embudo comercial del concesionario</CardTitle>
             </CardHeader>
             <CardContent>
                 {data.length > 0 ? (

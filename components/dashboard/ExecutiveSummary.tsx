@@ -25,7 +25,7 @@ export default function ExecutiveSummary({ items }: { items: ExecutiveSummaryIte
             <CardHeader>
                 <div className="flex items-center gap-2">
                     <Lightbulb className="h-4 w-4 text-(--accent)" />
-                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Reporte ejecutivo automático</CardTitle>
+                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Reporte ejecutivo del concesionario</CardTitle>
                 </div>
             </CardHeader>
             <CardContent className="space-y-3">

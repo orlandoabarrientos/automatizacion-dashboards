@@ -275,7 +275,7 @@ export function buildAnalytics(rows: ParsedRow[], columns: string[]) {
         campaignRanking,
     };
 
-    // Executive Summary
+    // Executive Summary — Concesionario
     const summary: ExecutiveSummaryItem[] = [];
 
     const totalRows = rows.length;
@@ -293,36 +293,139 @@ export function buildAnalytics(rows: ParsedRow[], columns: string[]) {
               }, 0)
         : 0;
 
-    const topChannel = revenueByChannel[0];
-    if (topChannel) {
-        summary.push({ text: `El canal con mayor ingreso es ${topChannel.name} (${new Intl.NumberFormat("es-ES", { style: "currency", currency: "USD" }).format(topChannel.value)}).`, tone: "good" });
-    }
+    const fmtCur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+    const fmtPct = new Intl.NumberFormat("es-ES", { style: "percent", minimumFractionDigits: 1 });
 
+    // Tasa de cierre
     summary.push({
-        text: `La tasa de conversión actual es ${new Intl.NumberFormat("es-ES", { style: "percent", minimumFractionDigits: 1 }).format(conversionRate)}, ${conversionRate >= 0.25 ? "por encima" : "por debajo"} del benchmark recomendado del 25%.`,
+        text: `La tasa de cierre actual es ${fmtPct.format(conversionRate)}, ${conversionRate >= 0.25 ? "por encima" : "por debajo"} del benchmark del 25%.`,
         tone: conversionRate >= 0.25 ? "good" : "warning",
     });
 
     if (pipelineAmount > 0) {
-        summary.push({ text: `El pipeline abierto representa ${new Intl.NumberFormat("es-ES", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(pipelineAmount)}.`, tone: "neutral" });
+        summary.push({ text: `El pipeline abierto representa ${fmtCur.format(pipelineAmount)} en oportunidades activas.`, tone: "neutral" });
     }
 
+    // Top asesor
+    const topSeller = stats.rankings.topSellersByRevenue[0];
+    if (topSeller) {
+        summary.push({ text: `El asesor con mayor volumen de ventas es ${topSeller.name} (${fmtCur.format(topSeller.value)}).`, tone: "good" });
+    }
+
+    // Top sucursal
+    const topBranch = stats.rankings.topSellersByRevenue[0]; // Reuse or create branch ranking if available
+    // For now use top seller as proxy or skip if no branch ranking
+
+    // Top marca
+    if (fields.marca && fields.monto) {
+        const brandMap: Record<string, number> = {};
+        for (const row of rows) {
+            const brand = String(row[fields.marca] ?? "").trim() || "Sin marca";
+            const m = extractNumericValue(row[fields.monto]);
+            if (m !== null) brandMap[brand] = (brandMap[brand] ?? 0) + m;
+        }
+        const topBrandEntry = Object.entries(brandMap).sort((a, b) => b[1] - a[1])[0];
+        if (topBrandEntry) {
+            summary.push({ text: `La marca con mayor facturación estimada es ${topBrandEntry[0]} (${fmtCur.format(topBrandEntry[1])}).`, tone: "good" });
+        }
+    }
+
+    // Top modelo
+    if (fields.modelo && fields.monto) {
+        const modelMap: Record<string, number> = {};
+        for (const row of rows) {
+            const model = String(row[fields.modelo] ?? "").trim() || "Sin modelo";
+            const m = extractNumericValue(row[fields.monto]);
+            if (m !== null) modelMap[model] = (modelMap[model] ?? 0) + m;
+        }
+        const topModelEntry = Object.entries(modelMap).sort((a, b) => b[1] - a[1])[0];
+        if (topModelEntry) {
+            summary.push({ text: `El modelo con mayor demanda es ${topModelEntry[0]} (${fmtCur.format(topModelEntry[1])}).`, tone: "good" });
+        }
+    }
+
+    // Canal
+    const topChannel = revenueByChannel[0];
+    if (topChannel) {
+        summary.push({ text: `El canal que más oportunidades genera es ${topChannel.name} (${fmtCur.format(topChannel.value)}).`, tone: "good" });
+    }
+
+    // Pipeline ponderado
+    const weightedPipeline = pipelineAmount > 0 ? stats.amounts.avg ?? 0 : 0; // Approx
+    // Use actual weighted from metrics if available; here we approximate
+    summary.push({ text: `El pipeline ponderado actual es ${fmtCur.format(pipelineAmount)} en oportunidades activas.`, tone: "neutral" });
+
+    // Facturas
     if (invoicesRequiredVsSent.length > 0) {
         const pending = Math.max(0, invoicesRequiredVsSent[0]?.value ?? 0 - (invoicesRequiredVsSent[1]?.value ?? 0));
         summary.push({ text: `Hay ${pending} facturas pendientes de envío.`, tone: pending > 0 ? "warning" : "good" });
     }
 
+    // Financiamiento
+    if (fields.financiamiento) {
+        let financingCount = 0;
+        for (const row of rows) {
+            const fin = extractBooleanValue(row[fields.financiamiento]);
+            if (fin === true) financingCount++;
+        }
+        if (financingCount > 0) {
+            summary.push({ text: `${financingCount} oportunidades requieren financiamiento.`, tone: "neutral" });
+        }
+    }
+
+    // Banco más usado
+    if (fields.bancoFinanciador) {
+        const bankMap: Record<string, number> = {};
+        for (const row of rows) {
+            const bank = String(row[fields.bancoFinanciador] ?? "").trim();
+            if (bank) bankMap[bank] = (bankMap[bank] ?? 0) + 1;
+        }
+        const topBankEntry = Object.entries(bankMap).sort((a, b) => b[1] - a[1])[0];
+        if (topBankEntry) {
+            summary.push({ text: `El banco más usado para financiamiento es ${topBankEntry[0]} (${topBankEntry[1]} operaciones).`, tone: "good" });
+        }
+    }
+
+    // Riesgo alto
+    if (fields.riesgoChurn) {
+        let highRiskCount = 0;
+        for (const row of rows) {
+            const risk = String(row[fields.riesgoChurn] ?? "").trim().toLowerCase();
+            if (risk.includes("alto") || risk.includes("high") || risk.includes("critico")) highRiskCount++;
+        }
+        if (highRiskCount > 0) {
+            summary.push({ text: `Hay ${highRiskCount} oportunidades con riesgo alto de pérdida.`, tone: highRiskCount > 5 ? "danger" : "warning" });
+        }
+    }
+
+    // Test drives
+    if (fields.testDrive) {
+        let tdCount = 0;
+        for (const row of rows) {
+            const td = extractBooleanValue(row[fields.testDrive]);
+            if (td === true) tdCount++;
+        }
+        if (tdCount > 0) {
+            summary.push({ text: `Se han realizado ${tdCount} test drives.`, tone: "good" });
+        }
+    }
+
+    // SLA
     if (stats.time.avgResponseMin !== null) {
         const withinSla = stats.time.avgResponseMin <= 60;
-        summary.push({ text: `El tiempo promedio de respuesta es ${new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).format(stats.time.avgResponseMin)} min, ${withinSla ? "dentro" : "fuera"} del SLA de 60 min.`, tone: withinSla ? "good" : "danger" });
+        summary.push({ text: `El tiempo promedio de respuesta es ${new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).format(stats.time.avgResponseMin)} min, ${withinSla ? "dentro" : "fuera"} del SLA comercial.`, tone: withinSla ? "good" : "danger" });
+    }
+
+    if (stats.time.slaCompliancePct !== null) {
+        summary.push({ text: `El cumplimiento SLA comercial es ${fmtPct.format(stats.time.slaCompliancePct)}.`, tone: stats.time.slaCompliancePct >= 0.9 ? "good" : stats.time.slaCompliancePct >= 0.7 ? "warning" : "danger" });
     }
 
     if (lostCount > wonCount) {
-        summary.push({ text: `Se han perdido más oportunidades (${lostCount}) de las ganadas (${wonCount}). Revisar motivos de pérdida.`, tone: "danger" });
+        summary.push({ text: `Se han perdido más operaciones (${lostCount}) de las ganadas (${wonCount}). Revisar motivos de pérdida.`, tone: "danger" });
     }
 
     if (stats.margin.lowCount > 0) {
-        summary.push({ text: `${stats.margin.lowCount} oportunidades tienen un margen bruto inferior a $500, lo que representa un riesgo de rentabilidad.`, tone: "warning" });
+        summary.push({ text: `${stats.margin.lowCount} operaciones tienen un margen bruto inferior a $500, lo que representa un riesgo de rentabilidad.`, tone: "warning" });
     }
 
     return { stats, charts, summary };

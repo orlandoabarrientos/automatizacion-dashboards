@@ -66,11 +66,13 @@ export default function DashboardShell({ data, status, error, filters, onFilters
                         <FiltersPanel rows={rows} columns={columns} filters={filters} onChange={onFiltersChange} />
 
                         <Tabs value={tab} onValueChange={setTab}>
-                            <TabsList className="mb-2">
+                            <TabsList className="mb-2 flex-wrap">
                                 <TabsTrigger value="resumen">Resumen</TabsTrigger>
-                                <TabsTrigger value="kpis">KPIs</TabsTrigger>
-                                <TabsTrigger value="estadisticas">Estadísticas</TabsTrigger>
+                                <TabsTrigger value="ventas">Ventas</TabsTrigger>
                                 <TabsTrigger value="embudo">Embudo</TabsTrigger>
+                                <TabsTrigger value="vehiculos">Vehículos</TabsTrigger>
+                                <TabsTrigger value="financiamiento">Financiamiento</TabsTrigger>
+                                <TabsTrigger value="operaciones">Operaciones</TabsTrigger>
                                 <TabsTrigger value="tabla">Tabla</TabsTrigger>
                                 <TabsTrigger value="logs">Logs</TabsTrigger>
                             </TabsList>
@@ -83,17 +85,28 @@ export default function DashboardShell({ data, status, error, filters, onFilters
                                 <HeatmapTable data={data?.charts?.cityVsChannel ?? []} />
                             </TabsContent>
 
-                            <TabsContent value="kpis" className="space-y-6">
-                                <KpiGrid kpis={data?.kpis ?? []} />
-                            </TabsContent>
-
-                            <TabsContent value="estadisticas" className="space-y-6">
-                                <StatisticalReport stats={data?.statistics ?? ({} as DashboardDataResponse["statistics"])} />
+                            <TabsContent value="ventas" className="space-y-6">
+                                <KpiGrid kpis={data?.kpis?.filter((k) => ["sales", "revenue", "margin", "pipeline"].includes(k.category)) ?? []} />
+                                <RevenueCharts charts={data?.charts ?? ({} as DashboardDataResponse["charts"])} />
                                 <RankingTables stats={data?.statistics ?? ({} as DashboardDataResponse["statistics"])} />
                             </TabsContent>
 
                             <TabsContent value="embudo" className="space-y-6">
                                 <PipelineFunnel charts={data?.charts ?? ({} as DashboardDataResponse["charts"])} />
+                                <StatisticalReport stats={data?.statistics ?? ({} as DashboardDataResponse["statistics"])} />
+                            </TabsContent>
+
+                            <TabsContent value="vehiculos" className="space-y-6">
+                                <KpiGrid kpis={data?.kpis?.filter((k) => ["vehicle"].includes(k.category)) ?? []} />
+                                <RankingTables stats={data?.statistics ?? ({} as DashboardDataResponse["statistics"])} />
+                            </TabsContent>
+
+                            <TabsContent value="financiamiento" className="space-y-6">
+                                <KpiGrid kpis={data?.kpis?.filter((k) => ["financing"].includes(k.category)) ?? []} />
+                            </TabsContent>
+
+                            <TabsContent value="operaciones" className="space-y-6">
+                                <KpiGrid kpis={data?.kpis?.filter((k) => ["operations", "customer", "risk"].includes(k.category)) ?? []} />
                             </TabsContent>
 
                             <TabsContent value="tabla" className="space-y-6">

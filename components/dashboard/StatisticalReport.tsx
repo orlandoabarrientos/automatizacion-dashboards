@@ -20,7 +20,7 @@ export default function StatisticalReport({ stats }: { stats: DashboardStatistic
             {/* Estadísticas de montos */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Estadísticas de montos</CardTitle>
+                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Estadísticas de operaciones</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -40,7 +40,7 @@ export default function StatisticalReport({ stats }: { stats: DashboardStatistic
             {/* Estadísticas de margen */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Estadísticas de margen</CardTitle>
+                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Estadísticas de margen comercial</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -56,7 +56,7 @@ export default function StatisticalReport({ stats }: { stats: DashboardStatistic
             {/* Estadísticas de tiempo */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Estadísticas de tiempo</CardTitle>
+                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Estadísticas de tiempo comercial</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

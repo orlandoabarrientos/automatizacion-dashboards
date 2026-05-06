@@ -37,21 +37,21 @@ export default function DashboardHeader({ status, lastSync, totalRows, totalColu
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                        <p className="text-xs uppercase tracking-[0.25em] text-(--muted-foreground)">Dashboard Empresarial</p>
+                        <p className="text-xs uppercase tracking-[0.25em] text-(--muted-foreground)">Dashboard de Concesionario</p>
                         <Badge tone={c.tone} className="gap-2">
                             <StatusDot tone={dot[status]} />
                             {c.label}
                         </Badge>
                     </div>
-                    <h1 className="text-3xl font-semibold tracking-tight">Panel Ejecutivo de Ventas</h1>
+                    <h1 className="text-3xl font-semibold tracking-tight">Panel de Ventas y Operaciones</h1>
                     <p className="text-sm text-(--muted-foreground)">
-                        Datos sincronizados por n8n desde Google Sheets. Sin base de datos.
+                        Ventas, leads, financiamiento y postventa sincronizados por n8n. Sin base de datos.
                     </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                     <Button variant="outline" onClick={onRefresh} disabled={isRefreshing} className="gap-2">
                         <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-                        {isRefreshing ? "Actualizando..." : "Actualizar desde n8n"}
+                        {isRefreshing ? "Actualizando..." : "Actualizar datos"}
                     </Button>
                     {refreshMessage ? (
                         <p className="max-w-xs text-right text-xs text-(--muted-foreground)">{refreshMessage}</p>

@@ -24,7 +24,7 @@ export default function StatusDistribution({ charts }: { charts: DashboardCharts
             {/* Estados */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Distribución por estado</CardTitle>
+                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Distribución por estado comercial</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {charts.statusDistribution.length > 0 ? (

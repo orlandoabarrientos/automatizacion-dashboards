@@ -60,6 +60,9 @@ export const detectCanalField = (keys: string[]) =>
 export const detectVendedorField = (keys: string[]) =>
     findField(keys, ["vendedor", "seller", "asesor", "vendedor_nombre", "sales_rep"]);
 
+export const detectEquipoVentasField = (keys: string[]) =>
+    findField(keys, ["equipo_ventas", "equipo", "sales_team", "team"]);
+
 export const detectCiudadField = (keys: string[]) =>
     findField(keys, ["ciudad", "city", "ciudad_cliente", "localidad"]);
 
@@ -129,6 +132,21 @@ export const detectMarcaField = (keys: string[]) =>
 export const detectModeloField = (keys: string[]) =>
     findField(keys, ["modelo", "model"]);
 
+export const detectAnoVehiculoField = (keys: string[]) =>
+    findField(keys, ["ano_vehiculo", "año_vehiculo", "year", "vehicle_year", "ano"]);
+
+export const detectPrecioListaUsdField = (keys: string[]) =>
+    findField(keys, ["precio_lista_usd", "precio_lista", "list_price", "precio_base"]);
+
+export const detectDescuentoUsdField = (keys: string[]) =>
+    findField(keys, ["descuento_usd", "descuento", "discount", "discount_usd"]);
+
+export const detectFinanciamientoField = (keys: string[]) =>
+    findField(keys, ["financiamiento", "financing", "requiere_financiamiento", "credit"]);
+
+export const detectOrigenLeadField = (keys: string[]) =>
+    findField(keys, ["origen_lead", "lead_source", "origen", "source"]);
+
 export const detectSegmentoField = (keys: string[]) =>
     findField(keys, ["segmento", "segment"]);
 
@@ -184,6 +202,7 @@ export type FieldMap = {
     testDrive: string | null;
     marca: string | null;
     modelo: string | null;
+    anoVehiculo: string | null;
     segmento: string | null;
     industria: string | null;
     tipoCliente: string | null;
@@ -191,6 +210,11 @@ export type FieldMap = {
     bancoFinanciador: string | null;
     metodoPago: string | null;
     mes: string | null;
+    equipoVentas: string | null;
+    precioListaUsd: string | null;
+    descuentoUsd: string | null;
+    financiamiento: string | null;
+    origenLead: string | null;
 };
 
 export function detectAllFields(keys: string[]): FieldMap {
@@ -228,6 +252,7 @@ export function detectAllFields(keys: string[]): FieldMap {
         testDrive: detectTestDriveField(keys),
         marca: detectMarcaField(keys),
         modelo: detectModeloField(keys),
+        anoVehiculo: detectAnoVehiculoField(keys),
         segmento: detectSegmentoField(keys),
         industria: detectIndustriaField(keys),
         tipoCliente: detectTipoClienteField(keys),
@@ -235,5 +260,10 @@ export function detectAllFields(keys: string[]): FieldMap {
         bancoFinanciador: detectBancoFinanciadorField(keys),
         metodoPago: detectMetodoPagoField(keys),
         mes: detectMesField(keys),
+        equipoVentas: detectEquipoVentasField(keys),
+        precioListaUsd: detectPrecioListaUsdField(keys),
+        descuentoUsd: detectDescuentoUsdField(keys),
+        financiamiento: detectFinanciamientoField(keys),
+        origenLead: detectOrigenLeadField(keys),
     };
 }

@@ -8,9 +8,9 @@ export default function EmptyState() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-(--muted)">
                 <Inbox className="h-6 w-6 text-(--muted-foreground)" />
             </div>
-            <p className="text-lg font-semibold text-(--foreground)">Aún no hay datos</p>
+            <p className="text-lg font-semibold text-(--foreground)">Aún no hay operaciones</p>
             <p className="mt-2 max-w-md text-sm text-(--muted-foreground)">
-                n8n aún no ha enviado datos. Verifica el workflow y asegúrate de que el endpoint{" "}
+                n8n aún no ha sincronizado ventas, leads ni operaciones. Verifica el workflow y asegúrate de que el endpoint{" "}
                 <code className="rounded bg-(--muted) px-1 py-0.5 text-xs">/api/sheets-sync</code>{" "}
                 esté configurado correctamente.
             </p>

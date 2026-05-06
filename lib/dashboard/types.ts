@@ -16,7 +16,7 @@ export type LogEntry = {
 };
 
 export type KpiStatus = "good" | "warning" | "danger" | "neutral";
-export type KpiCategory = "revenue" | "sales" | "operations" | "risk" | "customer" | "pipeline";
+export type KpiCategory = "sales" | "revenue" | "margin" | "pipeline" | "vehicle" | "financing" | "operations" | "customer" | "risk" | "advisor";
 export type DashboardStatus = "connected" | "empty" | "error";
 
 export type KpiItem = {
@@ -36,19 +36,30 @@ export type DashboardFilters = {
     dateTo: string | null;
     mes: string | null;
     estado: string | null;
+    etapaPipeline: string | null;
     canal: string | null;
     vendedor: string | null;
+    equipoVentas: string | null;
     ciudad: string | null;
     sucursal: string | null;
     campana: string | null;
+    marca: string | null;
+    modelo: string | null;
+    anoVehiculo: string | null;
     productoCategoria: string | null;
+    tipoOperacion: string | null;
     temperaturaLead: string | null;
     prioridad: string | null;
     riesgoChurn: string | null;
+    financiamiento: string | null;
+    bancoFinanciador: string | null;
+    testDrive: string | null;
     facturaEnviada: string | null; // "true" | "false" | null
     cumplimientoSla: string | null; // "true" | "false" | null
     montoMin: number | null;
     montoMax: number | null;
+    margenMin: number | null;
+    margenMax: number | null;
 };
 
 export type ChartPoint = {

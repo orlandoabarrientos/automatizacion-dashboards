@@ -8,7 +8,7 @@ export default function HeatmapTable({ data }: { data: DashboardCharts["cityVsCh
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Ciudad vs Canal</CardTitle>
+                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Leads por ciudad y canal</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="flex h-[200px] items-center justify-center text-sm text-(--muted-foreground)">Sin datos de ciudad/canal</div>

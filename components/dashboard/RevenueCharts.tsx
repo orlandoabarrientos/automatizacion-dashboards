@@ -175,7 +175,7 @@ export default function RevenueCharts({ charts }: { charts: DashboardCharts }) {
             {/* Ingresos por mes */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Ingresos por mes</CardTitle>
+                    <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Ventas estimadas por mes</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {charts.revenueByMonth.length > 1 ? (
@@ -195,7 +195,7 @@ export default function RevenueCharts({ charts }: { charts: DashboardCharts }) {
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
-                        <EmptyChart message="No hay suficientes datos de ingresos por mes." />
+                        <EmptyChart message="No hay suficientes datos de ventas por mes." />
                     )}
                 </CardContent>
             </Card>
