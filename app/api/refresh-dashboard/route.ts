@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 
 export async function POST() {
-    const webhookUrl = process.env.N8N_WEBHOOK_URL;
+    const webhookUrl = process.env.N8N_REFRESH_WEBHOOK_URL;
 
     if (!webhookUrl) {
         return NextResponse.json(
             {
                 ok: false,
                 message:
-                    "N8N_WEBHOOK_URL no está configurada. Agrega esta variable al archivo .env.local para habilitar el refresh manual desde n8n.",
+                    "N8N_REFRESH_WEBHOOK_URL no está configurada. Agrega esta variable al archivo .env.local para habilitar el refresh manual desde n8n.",
             },
             { status: 503 }
         );
@@ -19,8 +19,8 @@ export async function POST() {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                ...(process.env.N8N_WEBHOOK_SECRET
-                    ? { "x-n8n-secret": process.env.N8N_WEBHOOK_SECRET }
+                ...(process.env.N8N_REFRESH_SECRET
+                    ? { "x-n8n-secret": process.env.N8N_REFRESH_SECRET }
                     : {}),
             },
             body: JSON.stringify({
