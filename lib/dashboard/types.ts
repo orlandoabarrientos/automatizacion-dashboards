@@ -130,7 +130,15 @@ export type DashboardCharts = {
     riskDistribution: ChartPoint[];
     conversionRateMonthly: ChartPoint[];
     invoicesRequiredVsSent: ChartPoint[];
-    montosVsProbabilidad: Array<{ monto: number; probabilidad: number; canal: string }>;
+    montosVsProbabilidad: Array<{
+        id: string;
+        cliente: string;
+        monto: number;
+        probabilidad: number;
+        estado: string;
+        vendedor: string;
+        canal: string;
+    }>;
     cityVsChannel: Array<{ ciudad: string; canal: string; count: number }>;
     campaignRanking: RankingItem[];
 };

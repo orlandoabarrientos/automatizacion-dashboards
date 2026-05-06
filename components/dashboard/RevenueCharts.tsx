@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import {
     Area,
     AreaChart,
@@ -13,6 +14,9 @@ import {
     YAxis,
     CartesianGrid,
     Legend,
+    ScatterChart,
+    Scatter,
+    ZAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardCharts } from "@/lib/dashboard/types";
@@ -29,6 +33,141 @@ const tooltipStyle = {
 const EmptyChart = ({ message }: { message: string }) => (
     <div className="flex h-[240px] items-center justify-center text-sm text-(--muted-foreground)">{message}</div>
 );
+
+function MoneyProbabilityChart({ data }: { data: DashboardCharts["montosVsProbabilidad"] }) {
+    const [filterEstado, setFilterEstado] = useState<string>("Todos");
+    const [filterVendedor, setFilterVendedor] = useState<string>("Todos");
+    const [filterCanal, setFilterCanal] = useState<string>("Todos");
+
+    const estados = useMemo(
+        () => Array.from(new Set(data.map((d) => d.estado).filter(Boolean))),
+        [data]
+    );
+    const vendedores = useMemo(
+        () => Array.from(new Set(data.map((d) => d.vendedor).filter(Boolean))),
+        [data]
+    );
+    const canales = useMemo(
+        () => Array.from(new Set(data.map((d) => d.canal).filter(Boolean))),
+        [data]
+    );
+
+    const filtered = useMemo(() => {
+        let out = data;
+        if (filterEstado !== "Todos") out = out.filter((d) => d.estado === filterEstado);
+        if (filterVendedor !== "Todos") out = out.filter((d) => d.vendedor === filterVendedor);
+        if (filterCanal !== "Todos") out = out.filter((d) => d.canal === filterCanal);
+        return out.slice(0, 500);
+    }, [data, filterEstado, filterVendedor, filterCanal]);
+
+    if (filtered.length === 0) {
+        return <EmptyChart message="No hay datos de probabilidad vs monto." />;
+    }
+
+    return (
+        <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+                <select
+                    value={filterEstado}
+                    onChange={(e) => setFilterEstado(e.target.value)}
+                    className="rounded-md border border-(--border) bg-(--panel) px-2 py-1 text-xs text-(--foreground)"
+                >
+                    <option value="Todos">Todos los estados</option>
+                    {estados.map((e) => (
+                        <option key={e} value={e}>{e}</option>
+                    ))}
+                </select>
+                <select
+                    value={filterVendedor}
+                    onChange={(e) => setFilterVendedor(e.target.value)}
+                    className="rounded-md border border-(--border) bg-(--panel) px-2 py-1 text-xs text-(--foreground)"
+                >
+                    <option value="Todos">Todos los vendedores</option>
+                    {vendedores.map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                    ))}
+                </select>
+                <select
+                    value={filterCanal}
+                    onChange={(e) => setFilterCanal(e.target.value)}
+                    className="rounded-md border border-(--border) bg-(--panel) px-2 py-1 text-xs text-(--foreground)"
+                >
+                    <option value="Todos">Todos los canales</option>
+                    {canales.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                    ))}
+                </select>
+                <span className="self-center text-xs text-(--muted-foreground)">
+                    {filtered.length} oportunidades
+                </span>
+            </div>
+
+            <ResponsiveContainer width="100%" height={280}>
+                <ScatterChart margin={{ top: 10, right: 24, bottom: 10, left: 16 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.25} />
+                    <XAxis
+                        type="number"
+                        dataKey="probabilidad"
+                        name="Probabilidad"
+                        domain={[0, 100]}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                        tickFormatter={(v) => `${v}%`}
+                    />
+                    <YAxis
+                        type="number"
+                        dataKey="monto"
+                        name="Monto"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                        width={60}
+                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                    />
+                    <ZAxis range={[30, 120]} />
+                    <Tooltip
+                        cursor={{ strokeDasharray: "3 3" }}
+                        content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null;
+                            const item = payload[0].payload as {
+                                cliente: string;
+                                id: string;
+                                monto: number;
+                                probabilidad: number;
+                                estado: string;
+                                vendedor: string;
+                            };
+                            return (
+                                <div
+                                    className="rounded-xl border p-3 text-sm shadow-xl"
+                                    style={{
+                                        backgroundColor: "var(--panel)",
+                                        borderColor: "var(--border)",
+                                        color: "var(--foreground)",
+                                    }}
+                                >
+                                    <p className="font-semibold">{item.cliente || item.id}</p>
+                                    <p>Monto: {formatCurrency(item.monto)}</p>
+                                    <p>Probabilidad: {item.probabilidad.toFixed(0)}%</p>
+                                    <p className="text-(--muted-foreground)">Estado: {item.estado || "N/A"}</p>
+                                    <p className="text-(--muted-foreground)">Vendedor: {item.vendedor || "N/A"}</p>
+                                </div>
+                            );
+                        }}
+                    />
+                    <Scatter
+                        name="Oportunidades"
+                        data={filtered}
+                        fill="var(--accent)"
+                        fillOpacity={0.55}
+                        stroke="none"
+                    />
+                </ScatterChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
 
 export default function RevenueCharts({ charts }: { charts: DashboardCharts }) {
     return (
@@ -106,22 +245,14 @@ export default function RevenueCharts({ charts }: { charts: DashboardCharts }) {
                 </CardContent>
             </Card>
 
-            {/* Monto vs Probabilidad */}
+            {/* Monto vs Probabilidad — ScatterChart */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-sm uppercase tracking-[0.2em] text-(--muted-foreground)">Monto vs Probabilidad de cierre</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {charts.montosVsProbabilidad.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={280}>
-                            <AreaChart data={charts.montosVsProbabilidad.map((d, i) => ({ ...d, index: i }))}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                                <XAxis dataKey="probabilidad" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} name="Probabilidad" type="number" domain={[0, 1]} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
-                                <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} width={60} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                                <Tooltip contentStyle={tooltipStyle} formatter={(_v, _n, props) => [`${formatCurrency(Number(props?.payload?.monto ?? 0))}`, `Canal: ${String(props?.payload?.canal ?? "")}`]} />
-                                <Area type="monotone" dataKey="monto" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.2} strokeWidth={2} />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                        <MoneyProbabilityChart data={charts.montosVsProbabilidad} />
                     ) : (
                         <EmptyChart message="No hay datos de probabilidad vs monto." />
                     )}

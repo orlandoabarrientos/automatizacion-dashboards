@@ -180,8 +180,8 @@ export function buildMontosVsProbabilidad(rows: Record<string, unknown>[]) {
 
             if (monto === null || probabilidadRaw === null) return null;
 
-            // Normalizar a 0-1 para el eje X del gráfico
-            const probabilidad = probabilidadRaw > 1 ? probabilidadRaw / 100 : probabilidadRaw;
+            // Dejar en escala 0-100 para el eje X del ScatterChart
+            const probabilidad = probabilidadRaw;
 
             return {
                 id: String(getFieldValue(row, ["id", "opp_id", "opportunity_id", "codigo"]) || row.row_number || ""),
